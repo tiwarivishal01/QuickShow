@@ -1,6 +1,6 @@
 import { clerkClient } from "@clerk/express";
-import Booking from "../models/Booking";
-import Movie from "../models/Movie";
+import Booking from "../models/Booking.js";
+import Movie from "../models/Movie.js";
 
 
 
@@ -66,7 +66,7 @@ export const getFavorites = async (req, res) => {
         //get movie from db
         const movies = await Movie.find({_id:{$in: favorites}})
 
-        res.json(success:true, movies)
+        res.json({success:true, movies})
 
 
     }catch(error){

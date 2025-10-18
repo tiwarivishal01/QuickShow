@@ -1,14 +1,14 @@
-import Booking from "../models/Booking";
-import Show from "../models/show";
+import Booking from "../models/Booking.js";
+import Show from "../models/show.js";
 
 //fn to check availability of seats
 export const checkSeatAvailability = async (showId, SelectedSeats) => {
     try {
-        const showData = await show.findById(showId);
+        const showData = await Show.findById(showId);
         if (!showData) {
             return { success: false, message: "Show not found" };
         }
-        const occupiedSeats = showData.occupiedSeats;
+        const occupiedSeats = showData.occupiedSeat;
         const isAnySeatTaken = SelectedSeats.some(Seat => occupiedSeats[Seat]);
 
         return !isAnySeatTaken;

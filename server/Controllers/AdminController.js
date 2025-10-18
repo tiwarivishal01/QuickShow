@@ -1,6 +1,6 @@
-import Booking from "../models/Booking";
-import Show from "../models/show";
-import User from "../models/user";
+import Booking from "../models/Booking.js";
+import Show from "../models/show.js";
+import User from "../models/user.js";
 
 
 
@@ -18,12 +18,12 @@ export const isAdmin = async (req, res) => {
 
 export const getDashboardData = async (req, res) => {
     try {
-        const Booking = await Booking.find({ isPaid: true });
+        const bookings = await Booking.find({ isPaid: true });
         const activeShows = await Show.find({ showDatetime: { $gte: new Date() } }).populate('movie');
         const totalUser = await User.countDocuments();
         const dashboardData = {
-            totalBookings: Booking.length,
-            totalRevenue: Booking.reduce((acc, booking) => acc + booking.amount, 0),
+            totalBookings: bookings.length,
+            totalRevenue: bookings.reduce((acc, booking) => acc + booking.amount, 0),
             activeShows: activeShows.length,
             totalUser: totalUser,
         }
@@ -44,7 +44,7 @@ export const getDashboardData = async (req, res) => {
 
 export const getAllShows = async (req, res) => {
     try {
-        const shows = await showRouter.find({ showDatetime: { $gte: new Date() } }).populate('movie').sort({ showDatetime: 1 });
+        const shows = await Show.find({ showDatetime: { $gte: new Date() } }).populate('movie').sort({ showDatetime: 1 });
         res.json({ success: true, shows })
 
 
