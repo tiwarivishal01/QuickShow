@@ -6,6 +6,9 @@ import { clerkMiddleware } from '@clerk/express'
 import { serve } from "inngest/express";
 import { inngest, functions } from "./inngest/index.js"
 import showRouter from './Routes/showRoutes.js';
+import bookingRouter from './Routes/BookingRoutes.js';
+import AdminRouter from './Routes/AdminRoutes.js';
+import userRouter from './Routes/UserRoutes.js';
 
 
 const app = express()
@@ -20,8 +23,11 @@ app.use(clerkMiddleware())
 
 //api routes
 app.get('/',(req, res)=>res.send('server is live!'))
-app.use('/api/show', showRouter)
 app.use("/api/inngest", serve({ client: inngest, functions }));
+app.use('/api/show', showRouter)
+app.use('/api/booking', bookingRouter)
+app.use('/api/admin', AdminRouter)
+app.use('/api/user', userRouter)
 
 
 app.listen(port,()=>{
