@@ -5,6 +5,7 @@ import connectdb from './config/db.js';
 import { clerkMiddleware } from '@clerk/express'
 import { serve } from "inngest/express";
 import { inngest, functions } from "./inngest/index.js"
+import showRouter from './Routes/showRoutes.js';
 
 
 const app = express()
@@ -19,6 +20,7 @@ app.use(clerkMiddleware())
 
 //api routes
 app.get('/',(req, res)=>res.send('server is live!'))
+app.use('/api/show', showRouter)
 app.use("/api/inngest", serve({ client: inngest, functions }));
 
 
