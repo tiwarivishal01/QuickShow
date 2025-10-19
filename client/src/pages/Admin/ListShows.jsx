@@ -3,33 +3,31 @@ import { dummyShowsData } from "../../assets";
 import Loading from "../../components/Loading";
 import Title from "../../components/Admin/Title";
 import { DateFormate } from "../../lib/DateFormate";
+import { useAppContext } from "../../Context/AppContext";
 
 const ListShows = () => {
   const currency = import.meta.env.VITE_CURRENCY || "$";
+   const { axios, getToken, user } = useAppContext();
   const [shows, setshows] = useState([]);
   const [loading, setLoading] = useState(true);
   const getAllShows = async () => {
     try {
-      setshows([
-        {
-          movie: dummyShowsData[0],
-          showDateTime: "2025-06-30T02:30:00.000z",
-          showPrice: 59,
-          occupiedSeats: {
-            A1: "user_1",
-            B1: "user_2",
-            C1: "user_3",
-          },
-        },
-      ]);
+      const {data}= await axios.get("/api/admin/all-shows",  {
+        headers: { Authorization: `Bearer ${await getToken()}` },
+      });
+      setshows(data.shows);
       setLoading(false);
     } catch (error) {
       console.log(error);
     }
   };
   useEffect(() => {
-    getAllShows();
-  }, []);
+    if(user){
+       getAllShows();
+
+    }
+   
+  }, [user]);
 
   return !loading ? (
     <>
@@ -51,13 +49,13 @@ const ListShows = () => {
                 className="border-b border-primary/10 bg-primary/5 even:bg-primary/10"
               >
                 <td className="p-2 min-w-45 pl-5">{show.movie.title}</td>
-                <td className="p-2">{DateFormate(show.showDateTime)}</td>
+                <td className="p-2">{DateFormate(show.showDatetime)}</td>
                 <td className="p-2">
-                  {Object.keys(show.occupiedSeats).length}
+                  {Object.keys(show.occupiedSeat || {}).length}
                 </td>
                 <td className="p-2">
                   {currency}{" "}
-                  {Object.keys(show.occupiedSeats).length * show.showPrice}
+                  {Object.keys(show.occupiedSeat || {}).length * show.showPrice}
                 </td>
               </tr>
             ))}

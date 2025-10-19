@@ -3,9 +3,15 @@ import AdminNavbar from '../../components/Admin/AdminNavbar'
 import { Sidebar } from 'lucide-react'
 import AdminSideBar from '../../components/Admin/AdminSideBar'
 import { Outlet } from 'react-router-dom'
+import { useAppContext } from '../../Context/AppContext'
+import Loading from '../../components/Loading'
 
 const Layout = () => {
-  return (
+
+  const {isAdmin, fetchIsAdmin} = useAppContext()
+
+
+  return isAdmin ? (
     <>
     <AdminNavbar />
     <div className='flex'>
@@ -16,7 +22,7 @@ const Layout = () => {
     </div>
       
     </>
-  )
+  ):<Loading what='layout' />
 }
 
 export default Layout

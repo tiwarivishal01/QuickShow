@@ -24,22 +24,25 @@ export const checkAdminStatus = async (req, res) => {
 
 // api to get dashboard data
 export const getDashboardData = async (req, res) => {
-    try {
-        const bookings = await Booking.find({ isPaid: true });
-        const activeShows = await Show.find({ showDatetime: { $gte: new Date() } }).populate('movie');
-        const totalUser = await User.countDocuments();
-        const dashboardData = {
-            totalBookings: bookings.length,
-            totalRevenue: bookings.reduce((acc, booking) => acc + booking.amount, 0),
-            activeShows: activeShows.length,
-            totalUser: totalUser,
-        }
+  try {
+    const bookings = await Booking.find({ isPaid: true });
+    const activeShows = await Show.find({ showDatetime: { $gte: new Date() } }).populate('movie');
+   
 
-        res.json({ success: true, dashboardData });
-    } catch (error) {
-        console.log(error);
-        res.json({ success: false, message: error.message });
+    const totalUser = await User.countDocuments();
+
+    const dashboardData = {
+      totalBookings: bookings.length,
+      totalRevenue: bookings.reduce((acc, booking) => acc + booking.amount, 0),
+      activeShows,
+      totalUser,
     }
+
+    res.json({ success: true, dashboardData });
+  } catch (error) {
+    console.log(error);
+    res.json({ success: false, message: error.message });
+  }
 }
 
 //api to get all shows

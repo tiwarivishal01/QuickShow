@@ -1,9 +1,16 @@
 export const DateFormate=(date)=>{
-    return new Date(date).toLocaleString('en-Us',{
-        weekday:'short',
-        month:'long',
-        day:'numeric',
-        hour:'numeric',
-        minutes:'numeric'
-    })
+    if (!date) return "N/A";
+    
+    try {
+        return new Date(date).toLocaleString('en-US',{
+            weekday:'short',
+            month:'long',
+            day:'numeric',
+            hour:'numeric',
+            minute:'numeric'
+        });
+    } catch (error) {
+        console.error("Date formatting error:", error);
+        return "Invalid date";
+    }
 }
