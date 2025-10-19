@@ -2,24 +2,22 @@ import { clerkClient } from "@clerk/express";
 import Booking from "../models/Booking.js";
 import Movie from "../models/Movie.js";
 
-
-
-//api controllewr fn to get user booking
+//api controller fn to get user booking
 export const getUserBookings = async (req, res) => {
     try {
-        const user = req.auth().userId;
+        const { userId } = req.auth;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+        const user = userId;
         const bookings = await Booking.find({ user }).populate({
             path: "show",
             populate: { path: "movie" }
         }).sort({ creditedAt: -1 })
-        res.json(
-            { success: true, bookings }
-        )
-
+        res.json({ success: true, bookings });
     } catch (error) {
         console.log(error);
-        res.json({ success: false, message: error.message })
-
+        res.json({ success: false, message: error.message });
     }
 }
 
@@ -28,8 +26,10 @@ export const getUserBookings = async (req, res) => {
 export const updateFavorites = async (req, res) => {
     try {
         const { movieId } = req.body;
-        const userId = req.auth().userId;
-
+        const { userId } = req.auth;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
 
         const user = await clerkClient.users.getUser(userId);
         if (!user.privateMetadata.favorites) {
@@ -37,44 +37,34 @@ export const updateFavorites = async (req, res) => {
         }
 
         if (!user.privateMetadata.favorites.includes(movieId)) {
-            user.privateMetadata.favorites.push(movieId)
+            user.privateMetadata.favorites.push(movieId);
         } else {
-            user.privateMetadata.favorites = user.privateMetadata.favorites.filter(item => item !== movieId)
-
+            user.privateMetadata.favorites = user.privateMetadata.favorites.filter(item => item !== movieId);
         }
-        await clerkClient.users.updateUserMetadata(userId, { privateMetadata: user.privateMetadata })
-
-        res.json({ success: true, message: "favorite added updated." })
-    }
-    catch (error) {
+        await clerkClient.users.updateUserMetadata(userId, { privateMetadata: user.privateMetadata });
+        res.json({ success: true, message: "favorite added updated." });
+    } catch (error) {
         console.log(error);
-        res.json({ success: false, message: error.message })
-
+        res.json({ success: false, message: error.message });
     }
-
-
 }
-
-
 
 //get favorite
 export const getFavorites = async (req, res) => {
-    try{
-        const user = await clerkClient.users.getUser(req.auth().userId)
-        const  favorites = user.privateMetadata.favorites;
+    try {
+        const { userId } = req.auth;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+        const user = await clerkClient.users.getUser(userId);
+        const favorites = user.privateMetadata.favorites;
 
         //get movie from db
-        const movies = await Movie.find({_id:{$in: favorites}})
+        const movies = await Movie.find({_id:{$in: favorites}});
 
-        res.json({success:true, movies})
-
-
-    }catch(error){
+        res.json({success:true, movies});
+    } catch(error) {
         console.log(error);
-        res.json({ success: false, message: error.message })
-        
+        res.json({ success: false, message: error.message });
     }
-
-
-
 }
