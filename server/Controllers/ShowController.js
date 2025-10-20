@@ -78,8 +78,12 @@ export const addShow = async (req, res) => {
         release_date: movieApiData.release_date,
         original_language: movieApiData.original_language,
         tagline: movieApiData.tagline || "",
-        genres: movieApiData.genres.map(genre => genre.name),
-        casts: (movieCreditsData.cast || []).map(cast => cast.name),
+        genres: (movieApiData.genres || []).map(genre => ({ id: genre.id, name: genre.name })),
+        // Store only cast with images to ensure UI can always render photos
+        casts: (movieCreditsData.cast || [])
+          .filter(cast => !!cast.profile_path)
+          .slice(0, 20)
+          .map(cast => ({ name: cast.name, profile_path: cast.profile_path })),
         vote_average: movieApiData.vote_average,
         runtime: movieApiData.runtime,
       };
@@ -152,7 +156,27 @@ export const getShow = async (req, res) => {
   try {
     const { movieId } = req.params;
     const shows = await Show.find({ movie: movieId, showDatetime: { $gte: new Date() } });
-    const movie = await Movie.findById(movieId);
+    let movie = await Movie.findById(movieId);
+
+    // If movie has no casts with images, refetch from TMDB once and update
+    if (!movie || !Array.isArray(movie.casts) || movie.casts.length === 0) {
+      try {
+        const credits = await axios.get(`https://api.themoviedb.org/3/movie/${movieId}/credits`, {
+          headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY || 'YOUR_TMDB_API_KEY_HERE'}` },
+          timeout: 15000,
+        });
+        const castWithImages = (credits.data.cast || [])
+          .filter(c => !!c.profile_path)
+          .slice(0, 20)
+          .map(c => ({ name: c.name, profile_path: c.profile_path }));
+        if (movie && castWithImages.length > 0) {
+          movie.casts = castWithImages;
+          await movie.save();
+        }
+      } catch (_) {
+        // swallow TMDB fetch error here; UI will just render without casts
+      }
+    }
 
     const dateTime = {};
     shows.forEach((show) => {
