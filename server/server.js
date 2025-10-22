@@ -15,6 +15,10 @@ const app = express()
 const port = 3000;
 await connectdb();
 
+//route for stripe
+app.use('/api/stripe', express.raw({ type: 'application/json' }));
+
+
 
 //middleware
 app.use(express.json())
