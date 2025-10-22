@@ -9,7 +9,7 @@ export const getNowPlayingMovies = async (req, res) => {
       "https://api.themoviedb.org/3/movie/now_playing",
       {
         headers: {
-          Authorization: `Bearer ${process.env.TMDB_API_KEY || 'YOUR_TMDB_API_KEY_HERE'}`,
+          Authorization: `Bearer ${process.env.TMDB_API_KEY}`,
         },
         timeout: 15000,
       }
@@ -51,11 +51,11 @@ export const addShow = async (req, res) => {
       try {
         [movieDetailsResponse, movieCreditsResponse] = await Promise.all([
           axios.get(`https://api.themoviedb.org/3/movie/${movieId}`, {
-            headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY || 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI4YTc5NGNkMDIzNGQ2ODU0MDYxOWQ1ZGFmZDYxZDYxYyIsIm5iZiI6MTc2MDc2ODQ2MS42MTUsInN1YiI6IjY4ZjMzMWNkNjc5YjM4NGEzODNlOTlhYyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.gedphSr6Tgk1Ex4p6XC6a0N-zgQc_gjMhIjgsN5oChE'}` },
+            headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY}` },
             timeout: 15000,
           }),
           axios.get(`https://api.themoviedb.org/3/movie/${movieId}/credits`, {
-            headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY || 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI4YTc5NGNkMDIzNGQ2ODU0MDYxOWQ1ZGFmZDYxZDYxYyIsIm5iZiI6MTc2MDc2ODQ2MS42MTUsInN1YiI6IjY4ZjMzMWNkNjc5YjM4NGEzODNlOTlhYyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.gedphSr6Tgk1Ex4p6XC6a0N-zgQc_gjMhIjgsN5oChE'}` },
+            headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY}` },
             timeout: 15000,
           }),
         ]);
@@ -162,7 +162,7 @@ export const getShow = async (req, res) => {
     if (!movie || !Array.isArray(movie.casts) || movie.casts.length === 0) {
       try {
         const credits = await axios.get(`https://api.themoviedb.org/3/movie/${movieId}/credits`, {
-          headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY || 'YOUR_TMDB_API_KEY_HERE'}` },
+          headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY}` },
           timeout: 15000,
         });
         const castWithImages = (credits.data.cast || [])
