@@ -86,19 +86,47 @@ const SeatLayout = () => {
         if(!selectedSeats || ! selectedSeats.length) return toast.error('Please select seats.')
         
           setIsBooking(true)
-          const {data} = await axios.post('/api/booking/create-booking', {showId: selectedTime.showId, selectedSeats},  { headers: { Authorization: `Bearer ${await getToken()}` } })
+          
+          // Get token with error handling
+          const token = await getToken();
+          if (!token) {
+            toast.error('Authentication failed. Please login again.');
+            return;
+          }
+          
+          const {data} = await axios.post('/api/booking/create-booking', {
+            showId: selectedTime.showId, 
+            selectedSeats
+          }, { 
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            } 
+          })
+          
           if(data && data.success){
-            toast.success('Booking successful!')
-            navigate('/my-bookings')
+            if(data.url) {
+              window.location.href = data.url;
+            } else {
+              toast.success('Booking successful!');
+              navigate('/my-bookings');
+            }
           }else{
             toast.error(data?.message || 'Booking failed. Please try again.')
           }
 
     }catch(error){
-      console.log(error);
+      console.log('Booking error:', error);
+      console.log('Error response:', error?.response?.data);
+      console.log('Error status:', error?.response?.status);
+      
       const serverMessage = error?.response?.data?.message;
       if(serverMessage){
         toast.error(serverMessage)
+      }else if(error?.response?.status === 401){
+        toast.error('Authentication failed. Please login again.')
+      }else if(error?.response?.status === 500){
+        toast.error('Server error. Please try again later.')
       }else{
         toast.error('Something went wrong while booking. Please try again.')
       }

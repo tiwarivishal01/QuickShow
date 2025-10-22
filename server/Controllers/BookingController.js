@@ -1,22 +1,24 @@
 import Booking from "../models/Booking.js";
 import Show from "../models/show.js";
+import Stripe from 'stripe';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 //fn to check availability of seats
 export const checkSeatAvailability = async (showId, SelectedSeats) => {
     try {
         const showData = await Show.findById(showId);
         if (!showData) {
-            return { success: false, message: "Show not found" };
+            return false;
         }
-        const occupiedSeats = showData.occupiedSeat;
+        const occupiedSeats = showData.occupiedSeat || {};
         const isAnySeatTaken = SelectedSeats.some(Seat => occupiedSeats[Seat]);
 
         return !isAnySeatTaken;
 
-
     } catch (error) {
         console.log(error);
-        return { success: false, message: "Error in checking seat availability" };
+        return false;
     }
 }
 
@@ -26,8 +28,14 @@ export const checkSeatAvailability = async (showId, SelectedSeats) => {
 
 export const createBooking = async (req, res) => {
     try {
-        const { userId } = req.auth()
+        // Get user ID from Clerk auth
+        const { userId } = req.auth || {};
         const { showId, selectedSeats } = req.body;
+        const { origin } = req.headers;
+
+        console.log('Auth object:', req.auth);
+        console.log('User ID:', userId);
+        console.log('Request body:', req.body);
 
         if (!userId) {
             return res.status(401).json({ success: false, message: "User not authenticated" });
@@ -66,7 +74,43 @@ export const createBooking = async (req, res) => {
         showData.markModified('occupiedSeat');
         await showData.save();
 
-        res.json({ success: true, booking, message: "Booked successfully" });
+        // Create Stripe checkout session
+        try {
+            if (!process.env.STRIPE_SECRET_KEY) {
+                res.json({ success: true, booking, message: "Booking created but Stripe not configured" });
+                return;
+            }
+            
+            const line_items = [{
+                price_data: {
+                    currency: 'usd',
+                    product_data: {
+                        name: showData.movie.title,
+                    },
+                    unit_amount: Math.floor(booking.amount) * 100,
+                },
+                quantity: 1
+            }];
+
+            const session = await stripe.checkout.sessions.create({
+                success_url: `${origin}/loading/my-bookings?success=true`,
+                cancel_url: `${origin}/my-bookings?canceled=true`,
+                line_items: line_items,
+                mode: 'payment',
+                metadata: {
+                    bookingId: booking._id.toString(),
+                },
+                expires_at: Math.floor(Date.now() / 1000) + 1800, // expires in 30 minutes
+            });
+
+            booking.paymentLink = session.url;
+            await booking.save();
+
+            res.json({ success: true, booking, url: session.url });
+        } catch (stripeError) {
+            // If Stripe fails, still return success but without payment URL
+            res.json({ success: true, booking, message: "Booking created but payment setup failed" });
+        }
 
     } catch (error) {
         console.log(error);
