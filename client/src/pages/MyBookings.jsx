@@ -5,12 +5,16 @@ import BlurCircle from "../components/BlurCircle";
 import timeFormat from "../lib/TimeFormate";
 import { DateFormate } from "../lib/DateFormate";
 import { useAppContext } from "../Context/AppContext";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { toast } from "react-hot-toast";
 
 const MyBookings = () => {
   const {  axios, getToken, user, image_base_url } = useAppContext();
   const currency = import.meta.env.VITE_CURRENCY || "$";
   const [bookings, setBookings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const getMyBookings = async () => {
     // // simulate fetching dummy data
@@ -32,6 +36,52 @@ const MyBookings = () => {
     }
     setIsLoading(false)
   };
+
+  const handlePayNow = async (bookingId) => {
+    try {
+      const token = await getToken();
+      const { data } = await axios.post('/api/booking/refresh-payment', { bookingId }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (data.success && data.url) {
+        window.location.href = data.url;
+      } else {
+        toast.error(data.message || 'Failed to create payment session');
+      }
+    } catch (error) {
+      console.error('Refresh payment error:', error);
+      toast.error('Unable to start payment. Please try again.');
+    }
+  }
+
+  // Confirm Stripe session on redirect if present
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const success = params.get('success');
+    const sessionId = params.get('session_id');
+    if (success === 'true' && sessionId) {
+      (async () => {
+        try {
+          const token = await getToken();
+          const { data } = await axios.post('/api/booking/confirm-session', { sessionId }, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (data.success) {
+            toast.success('Payment confirmed');
+            await getMyBookings();
+          } else {
+            toast.error(data.message || 'Payment not confirmed');
+          }
+        } catch (err) {
+          console.error('Confirm session error:', err);
+          toast.error('Failed to confirm payment');
+        } finally {
+          // Clean the URL so effect doesn't loop
+          navigate('/my-bookings', { replace: true });
+        }
+      })();
+    }
+  }, [location.search]);
 
   useEffect(() => {
     if(user){
@@ -94,7 +144,7 @@ const MyBookings = () => {
                   {item.amount || 0}
                 </p>
                 {!item.isPaid && (
-                  <button className="bg-primary px-4 py-1.5 text-sm rounded-full font-medium cursor-pointer hover:bg-primary/80 transition">
+                  <button onClick={() => handlePayNow(item._id)} className="bg-primary px-4 py-1.5 text-sm rounded-full font-medium cursor-pointer hover:bg-primary/80 transition">
                     Pay Now
                   </button>
                 )}
@@ -102,7 +152,7 @@ const MyBookings = () => {
               <div className="text-sm space-y-1">
                 <p>
                   <span className="text-gray-400">Total Tickets: </span>
-                  {item.bookedSeat?.length || 0}
+                  {item.bookedSeats?.length || 0}
                 </p>
                 <p>
                   <span className="text-gray-400">Seat Numbers: </span>

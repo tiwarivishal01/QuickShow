@@ -19,27 +19,41 @@ export const stripeWebhooks = async (req, res) => {
 
   try {
     switch (event.type) {
-      case 'payment_intent.succeeded': {
-        const paymentIntent = event.data.object;
-        const sessionList = await stripeInstance.checkout.sessions.list({
-          payment_intent: paymentIntent.id,
-        });
-
-        const session = sessionList.data[0];
-        if (!session) break;
-
-        const { bookingId } = session.metadata;
-        if (!bookingId) break;
-
-        await Booking.findByIdAndUpdate(bookingId, {
-          isPaid: true,
-          paymentLink: '',
-        });
-
-        console.log(`✅ Booking ${bookingId} marked as paid.`);
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        const bookingId = session?.metadata?.bookingId;
+        if (bookingId) {
+          await Booking.findByIdAndUpdate(bookingId, {
+            isPaid: true,
+            paymentLink: '',
+          });
+          console.log(`✅ Booking ${bookingId} marked as paid via checkout.session.completed.`);
+        } else {
+          console.warn('⚠️ No bookingId in session metadata');
+        }
         break;
       }
-
+      case 'payment_intent.succeeded': {
+        // Fallback in case you rely on payment_intent events
+        const paymentIntent = event.data.object;
+        try {
+          const sessionList = await stripeInstance.checkout.sessions.list({
+            payment_intent: paymentIntent.id,
+          });
+          const session = sessionList.data[0];
+          const bookingId = session?.metadata?.bookingId;
+          if (bookingId) {
+            await Booking.findByIdAndUpdate(bookingId, {
+              isPaid: true,
+              paymentLink: '',
+            });
+            console.log(`✅ Booking ${bookingId} marked as paid via payment_intent.succeeded.`);
+          }
+        } catch (e) {
+          console.error('Error resolving session from payment_intent:', e);
+        }
+        break;
+      }
       default:
         console.log('Unhandled event type:', event.type);
     }

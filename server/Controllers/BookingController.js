@@ -1,3 +1,4 @@
+import { inngest } from "../inngest/index.js";
 import Booking from "../models/Booking.js";
 import Show from "../models/show.js";
 import Stripe from 'stripe';
@@ -93,7 +94,7 @@ export const createBooking = async (req, res) => {
             }];
 
             const session = await stripe.checkout.sessions.create({
-                success_url: `${origin}/loading/my-bookings?success=true`,
+                success_url: `${origin}/my-bookings?success=true&session_id={CHECKOUT_SESSION_ID}`,
                 cancel_url: `${origin}/my-bookings?canceled=true`,
                 line_items: line_items,
                 mode: 'payment',
@@ -105,6 +106,14 @@ export const createBooking = async (req, res) => {
 
             booking.paymentLink = session.url;
             await booking.save();
+
+            //run inngest sdhuler fn to check payment steus
+            await inngest.send({
+                name: "app/checkpayment",
+                data:{
+                    bookingId: booking._id.toString()
+                }
+            })
 
             res.json({ success: true, booking, url: session.url });
         } catch (stripeError) {
@@ -118,7 +127,71 @@ export const createBooking = async (req, res) => {
     }
 }
 
+// Confirm session fallback when webhook not available
+export const confirmStripeSession = async (req, res) => {
+    try {
+        const { sessionId } = req.body;
+        if (!sessionId) {
+            return res.status(400).json({ success: false, message: 'Missing sessionId' });
+        }
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        const bookingId = session?.metadata?.bookingId;
+        if (!bookingId) {
+            return res.status(400).json({ success: false, message: 'Missing bookingId in session' });
+        }
+        if (session.payment_status === 'paid') {
+            await Booking.findByIdAndUpdate(bookingId, {
+                isPaid: true,
+                paymentLink: ''
+            });
+            return res.json({ success: true, message: 'Payment confirmed', bookingId });
+        }
+        return res.json({ success: false, message: 'Payment not completed yet' });
+    } catch (error) {
+        console.error('Confirm session error:', error);
+        res.status(500).json({ success: false, message: 'Internal error confirming session' });
+    }
+}
 
+// Refresh payment link for unpaid/expired sessions
+export const refreshPaymentLink = async (req, res) => {
+    try {
+        const { bookingId } = req.body;
+        const { origin } = req.headers;
+        const booking = await Booking.findById(bookingId).populate({
+            path: 'show',
+            populate: { path: 'movie' }
+        });
+        if (!booking) {
+            return res.status(404).json({ success: false, message: 'Booking not found' });
+        }
+        if (booking.isPaid) {
+            return res.json({ success: true, message: 'Booking already paid' });
+        }
+        const line_items = [{
+            price_data: {
+                currency: 'usd',
+                product_data: { name: booking.show.movie.title },
+                unit_amount: Math.floor(booking.amount) * 100,
+            },
+            quantity: 1,
+        }];
+        const session = await stripe.checkout.sessions.create({
+            success_url: `${origin}/my-bookings?success=true&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${origin}/my-bookings?canceled=true`,
+            line_items,
+            mode: 'payment',
+            metadata: { bookingId: booking._id.toString() },
+            expires_at: Math.floor(Date.now() / 1000) + 1800,
+        });
+        booking.paymentLink = session.url;
+        await booking.save();
+        res.json({ success: true, url: session.url });
+    } catch (error) {
+        console.error('Refresh payment link error:', error);
+        res.status(500).json({ success: false, message: 'Failed to refresh payment link' });
+    }
+}
 
 
 export const getOccupiedSeats = async (req, res) => {
