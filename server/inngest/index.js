@@ -2,6 +2,8 @@ import { Inngest } from "inngest";
 import User from "../models/user.js";
 import Booking from "../models/Booking.js";
 import Show from "../models/show.js";
+import sendEmail from "../config/nodeMailer.js";
+
 
 // Create a client to send and receive events
 export const inngest = new Inngest({ id: "movie-ticket-booking" });
@@ -19,7 +21,6 @@ const syncUserCreation = inngest.createFunction(
       name: `${first_name} ${last_name}`,
       image: image_url,
     };
-    console.log(userData)
     await User.create(userData);
   }
 );
@@ -79,5 +80,35 @@ const ReleaseSeatsAndDeleteBooking = inngest.createFunction(
     })
   })
 
+const sendBookingConfirmationMail = inngest.createFunction(
+  { id: 'send-booking-confirmation-mail' },
+  { event: 'app/show.booked' },
+  async ({ event, step }) => {
+    const { bookingId } = event.data;
+    const booking = await Booking.findById(bookingId)
+      .populate({
+        path: 'show',
+        populate: {
+          path: 'movie',
+          model: 'Movie'
+        }
+      }).populate('user');
+
+      await sendEmail({
+        to: booking.user.email,
+        subject: `Booking Confirmation for ${booking.show.movie.title}`,
+        body:  `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden"><div style="background:#1f2937;color:#fff;padding:20px;text-align:center"><h1>🎬 Booking Confirmed!</h1></div><div style="padding:30px"><h2>Hi ${booking.user.name},</h2><p>Your movie ticket booking has been confirmed:</p><div style="background:#f8f9fa;padding:20px;border-radius:6px;margin:20px 0"><h3>${booking.show.movie.title}</h3><p><strong>Date:</strong> ${new Date(booking.show.showDatetime).toLocaleDateString()}</p><p><strong>Time:</strong> ${new Date(booking.show.showDatetime).toLocaleTimeString()}</p></div><div style="border-left:4px solid #3b82f6;padding-left:15px;margin:20px 0"><p><strong>Booking ID:</strong> ${booking._id}</p><p><strong>Amount:</strong> $${booking.amount}</p><p><strong>Seats:</strong> ${booking.bookedSeats.join(', ')}</p></div><p>Enjoy your movie!</p></div></div>`
+
+      })
+    
+    if (booking && booking.user) {
+      console.log(`Booking confirmation for ${booking.user.email}`);
+    }
+  }
+);
+
+
+
+
 // Create an empty array where we'll export future Inngest functions
-export const functions = [syncUserCreation, syncUserDeletion, syncUserUpdation, ReleaseSeatsAndDeleteBooking];
+export const functions = [syncUserCreation, syncUserDeletion, syncUserUpdation, ReleaseSeatsAndDeleteBooking, sendBookingConfirmationMail, sendBookingConfirmationMail];

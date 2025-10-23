@@ -26,10 +26,22 @@ export const stripeWebhooks = async (req, res) => {
           await Booking.findByIdAndUpdate(bookingId, {
             isPaid: true,
             paymentLink: '',
-          });
-          console.log(`✅ Booking ${bookingId} marked as paid via checkout.session.completed.`);
+          }
+        )
+        //send comnfirmation mail
+        await inngest.send({
+          name: 'app/show.booked',
+          data: {
+            bookingId
+          }
+        })
+
+
+
+
+          console.log(`Booking ${bookingId} marked as paid via checkout.session.completed.`);
         } else {
-          console.warn('⚠️ No bookingId in session metadata');
+          console.warn('No bookingId in session metadata');
         }
         break;
       }

@@ -25,30 +25,10 @@ const DashBoard = () => {
   const [loading, setLoading] = useState(true);
 
   const DashBoardCards = [
-    {
-      title: "Total Bookings",
-      value: DashBoardData.totalBookings || "0",
-      icon: ChartLineIcon,
-    },
-    {
-      title: "Total Revenue",
-      value: `${currency}${DashBoardData.totalRevenue || "0"}`,
-      icon: CircleDollarSignIcon,
-    },
-    {
-      title: "Active Shows",
-      value:
-        Array.isArray(DashBoardData.activeShows) &&
-        DashBoardData.activeShows.length
-          ? DashBoardData.activeShows.length
-          : "0",
-      icon: PlayCircleIcon,
-    },
-    {
-      title: "Total Users",
-      value: DashBoardData.totalUser || "0",
-      icon: UserIcon,
-    },
+    { title: "Total Bookings", value: DashBoardData.totalBookings, icon: ChartLineIcon },
+    { title: "Total Revenue", value: `${currency}${DashBoardData.totalRevenue}`, icon: CircleDollarSignIcon },
+    { title: "Active Shows", value: DashBoardData.activeShows.length, icon: PlayCircleIcon },
+    { title: "Total Users", value: DashBoardData.totalUser, icon: UserIcon },
   ];
 
   const fetchDashboardData = async () => {
@@ -57,10 +37,7 @@ const DashBoard = () => {
         headers: { Authorization: `Bearer ${await getToken()}` },
       });
       if (!data.success) throw new Error(data.message || "Failed to load dashboard");
-      // Guard: filter out shows missing populated movie
-      const activeShows = Array.isArray(data.dashboardData?.activeShows)
-        ? data.dashboardData.activeShows.filter(s => !!s?.movie)
-        : [];
+      const activeShows = (data.dashboardData?.activeShows || []).filter(s => s?.movie);
       setDashBoardData({
         totalBookings: data.dashboardData?.totalBookings || 0,
         totalRevenue: data.dashboardData?.totalRevenue || 0,
@@ -68,7 +45,6 @@ const DashBoard = () => {
         totalUser: data.dashboardData?.totalUser || 0,
       });
     } catch (error) {
-      console.log(error);
       toast.error(error.message || "Error loading dashboard");
     } finally {
       setLoading(false);
@@ -109,11 +85,8 @@ const DashBoard = () => {
       <p className="mt-10 text-lg font-medium">Active Shows</p>
       <div className="relative flex flex-wrap gap-6 mt-4 max-w-5xl">
         <BlurCircle top="100px" left="-10%" />
-        {Array.isArray(DashBoardData.activeShows) &&
-        DashBoardData.activeShows.length > 0 ? (
-          DashBoardData.activeShows
-            .filter((show) => !!show?.movie)
-            .map((show) => (
+        {DashBoardData.activeShows.length > 0 ? (
+          DashBoardData.activeShows.map((show) => (
               <div
                 key={show._id}
                 className="w-55 rounded-lg overflow-hidden h-full pb-3 bg-primary/10 border border-primary/20 hover:-translate-y-1 transition duration-300"
