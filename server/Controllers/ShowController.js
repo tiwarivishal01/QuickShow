@@ -124,24 +124,55 @@ export const addShow = async (req, res) => {
 
 
 //api to get all shows from db
+export const getAllShows = async (req, res) => {
+  try {
+    const shows = await Show.find({ showDatetime: { $gte: new Date() } })
+      .populate('movie')
       .sort({ showDatetime: 1 });
 
-    const uniqueMoviesMap = new Map();
+    const moviesWithShows = new Map();
+
     shows.forEach(show => {
-      const movieDoc = show.movie;
-      if (!movieDoc || !movieDoc._id) return; // guard against null populated movie
-      const key = movieDoc._id.toString();
-      if (!uniqueMoviesMap.has(key)) {
-    // Filter unique movies
-        uniqueMoviesMap.set(key, movieDoc);
+      if (!show.movie) return; // Skip if movie population failed
+
+      const movieId = show.movie._id.toString();
+      if (!moviesWithShows.has(movieId)) {
+        moviesWithShows.set(movieId, {
+          movie: show.movie,
+          dates: new Map()
+        });
       }
-      if (!uniqueMoviesMap.has(show.movie._id.toString())) {
-        uniqueMoviesMap.set(show.movie._id.toString(), show.movie);
-    res.json({ success: false, message: error.message });
+
+      const movieEntry = moviesWithShows.get(movieId);
+      // Format date to YYYY-MM-DD for grouping
+      const showDate = show.showDatetime.toISOString().split("T")[0];
+
+      if (!movieEntry.dates.has(showDate)) {
+        movieEntry.dates.set(showDate, []);
+      }
+      movieEntry.dates.get(showDate).push({
+        time: show.showDatetime,
+        showId: show._id,
+        showPrice: show.showPrice,
+        occupiedSeat: show.occupiedSeat // Include occupied seats if needed for client-side filtering
+      });
+    });
+
+    // Convert maps to arrays for JSON response
+    const result = Array.from(moviesWithShows.values()).map(movieEntry => ({
+      movie: movieEntry.movie,
+      dates: Array.from(movieEntry.dates.entries()).map(([date, shows]) => ({
+        date,
+        shows: shows.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime()) // Sort shows by time
+      }))
+    }));
+
+    res.json({ success: true, movies: result });
+  } catch (error) {
+    console.error('Error in getAllShows:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
-
-
 
 //api to get a single show from db
 
@@ -185,3 +216,29 @@ export const getShow = async (req, res) => {
     res.json({ success: false, message: error.message });
   }
 };
+export const getShows = async (req, res) => {
+  try {
+    const shows = await Show.find({ showDatetime: { $gte: new Date() } })
+      .populate('movie')
+      .sort({ showDatetime: 1 });
+
+    const validShows = shows.filter(show => show.movie !== null);
+    const uniqueMoviesMap = new Map();
+    
+    validShows.forEach((show) => {
+      if (show && show.movie && show.movie._id) {
+        const movieId = show.movie._id.toString();
+        if (!uniqueMoviesMap.has(movieId)) {
+          uniqueMoviesMap.set(movieId, show.movie);
+        }
+      }
+    });
+
+    const uniqueMovies = Array.from(uniqueMoviesMap.values());
+    res.json({ success: true, shows: uniqueMovies });
+
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+

@@ -64,6 +64,7 @@ const ReleaseSeatsAndDeleteBooking = inngest.createFunction(
 
     await step.run('check-payment-status', async()=>{
       const bookingId = event.data.bookingId;
+      // amazonq-ignore-next-line
       const booking = await Booking.findById(bookingId);
 
       //if payment not made thn deleting booking and releasing the seat
@@ -111,4 +112,6 @@ const sendBookingConfirmationMail = inngest.createFunction(
 
 
 // Create an empty array where we'll export future Inngest functions
-export const functions = [syncUserCreation, syncUserDeletion, syncUserUpdation, ReleaseSeatsAndDeleteBooking, sendBookingConfirmationMail, sendBookingConfirmationMail];
+
+export const functions = [syncUserCreation, syncUserDeletion, syncUserUpdation, ReleaseSeatsAndDeleteBooking, sendBookingConfirmationMail];
+

@@ -30,16 +30,12 @@ export const AppProvider = ({ children }) => {
       const isAdminUser = data.success ? data.isAdmin : false;
       setIsAdmin(isAdminUser);
       
-      // Only show error if trying to access admin routes and not admin
       if (!isAdminUser && location.pathname.startsWith("/admin")) {
         navigate("/");
         toast.error("Access Denied! Admin privileges required.");
       }
     } catch (error) {
-      console.error("Error fetching admin status:", error);
       setIsAdmin(false);
-      
-      // Only show error if trying to access admin routes
       if (location.pathname.startsWith("/admin")) {
         toast.error("Access Denied! Admin privileges required.");
         navigate("/");
@@ -77,12 +73,11 @@ export const AppProvider = ({ children }) => {
         setFavoritesMovies([]);
       }
     } catch (error) {
-      console.error("Error fetching favorite movies:", error);
       setFavoritesMovies([]);
       if (error.response?.status === 401) {
         toast.error("Please log in to view favorites");
       } else if (error.response?.status === 404) {
-        console.log("Favorites endpoint not found");
+        // Silently handle missing endpoint
       } else {
         toast.error("Failed to load favorites");
       }
@@ -90,15 +85,15 @@ export const AppProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    // Always fetch shows; this endpoint is public
     fetchShows();
-    // Only admin/favorites need auth
     if (user) {
       fetchIsAdmin();
+      fetchFavoriteMovies();
     }
-      fetchShows();
   }, [user]);
 
+  const value = {
+    axios,
     fetchIsAdmin,
     fetchShows,
     fetchFavoriteMovies,
