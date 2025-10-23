@@ -113,7 +113,6 @@ export const addShow = async (req, res) => {
     res.json({ success: true, message: "Show added successfully." });
 
   } catch (error) {
-    console.error(error);
     res.status(500).json({
       success: false,
       message: "Server error: " + error.message,
@@ -125,25 +124,19 @@ export const addShow = async (req, res) => {
 
 
 //api to get all shows from db
-
-export const getShows = async (req, res) => {
-  try {
-    const shows = await Show.find({ showDatetime: { $gte: new Date() } })
-      .populate('movie')
       .sort({ showDatetime: 1 });
 
-    // Filter unique movies
     const uniqueMoviesMap = new Map();
     shows.forEach(show => {
+      const movieDoc = show.movie;
+      if (!movieDoc || !movieDoc._id) return; // guard against null populated movie
+      const key = movieDoc._id.toString();
+      if (!uniqueMoviesMap.has(key)) {
+    // Filter unique movies
+        uniqueMoviesMap.set(key, movieDoc);
+      }
       if (!uniqueMoviesMap.has(show.movie._id.toString())) {
         uniqueMoviesMap.set(show.movie._id.toString(), show.movie);
-      }
-    });
-
-    res.json({ success: true, shows: Array.from(uniqueMoviesMap.values()) });
-
-  } catch (error) {
-    console.log(error);
     res.json({ success: false, message: error.message });
   }
 };
@@ -189,8 +182,6 @@ export const getShow = async (req, res) => {
     res.json({ success: true, movie, dateTime});
 
   } catch (error) {
-    console.log(error);
-    
     res.json({ success: false, message: error.message });
   }
 };

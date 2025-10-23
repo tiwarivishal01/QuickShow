@@ -35,12 +35,12 @@ const AdminSideBar = () => {
               ${isActive ? 'bg-primary/15 text-primary' : ''}`
             }
           >
-            <link.icon className="w-5 h-5" />
-            <p className="max-md:hidden">{link.name}</p>
-
-            {/* Active Indicator */}
             {({ isActive }) => (
-              isActive && <span className="w-1.5 h-10 rounded-l bg-primary absolute right-0"></span>
+              <>
+                <link.icon className="w-5 h-5" />
+                <p className="max-md:hidden">{link.name}</p>
+                {isActive && <span className="w-1.5 h-10 rounded-l bg-primary absolute right-0"></span>}
+              </>
             )}
           </NavLink>
         ))}

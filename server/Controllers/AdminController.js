@@ -40,7 +40,6 @@ export const getDashboardData = async (req, res) => {
 
     res.json({ success: true, dashboardData });
   } catch (error) {
-    console.log(error);
     res.json({ success: false, message: error.message });
   }
 }
@@ -49,9 +48,9 @@ export const getDashboardData = async (req, res) => {
 export const getAllShows = async (req, res) => {
     try {
         const shows = await Show.find({ showDatetime: { $gte: new Date() } }).populate('movie').sort({ showDatetime: 1 });
-        res.json({ success: true, shows });
+        const validShows = shows.filter(show => show.movie !== null);
+        res.json({ success: true, shows: validShows });
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 }
@@ -67,7 +66,6 @@ export const getAllBookings = async (req, res) => {
         }).sort({ createdAt: -1 });
         res.json({ success: true, bookings });
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 }

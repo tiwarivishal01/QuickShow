@@ -56,21 +56,20 @@ const DashBoard = () => {
       const { data } = await axios.get("/api/admin/dashboard", {
         headers: { Authorization: `Bearer ${await getToken()}` },
       });
-      if (data.success) {
-        const safeData = {
-          ...data.dashboardData,
-          activeShows: Array.isArray(data.dashboardData.activeShows)
-            ? data.dashboardData.activeShows
-            : [],
-        };
-        setDashBoardData(safeData);
-      } else {
-        toast.error(data.message || "Failed to fetch dashboard data");
-      }
+      if (!data.success) throw new Error(data.message || "Failed to load dashboard");
+      // Guard: filter out shows missing populated movie
+      const activeShows = Array.isArray(data.dashboardData?.activeShows)
+        ? data.dashboardData.activeShows.filter(s => !!s?.movie)
+        : [];
+      setDashBoardData({
+        totalBookings: data.dashboardData?.totalBookings || 0,
+        totalRevenue: data.dashboardData?.totalRevenue || 0,
+        activeShows,
+        totalUser: data.dashboardData?.totalUser || 0,
+      });
     } catch (error) {
-      toast.error(
-        "An error occurred while fetching dashboard data. Please try again."
-      );
+      console.log(error);
+      toast.error(error.message || "Error loading dashboard");
     } finally {
       setLoading(false);
     }
@@ -112,35 +111,43 @@ const DashBoard = () => {
         <BlurCircle top="100px" left="-10%" />
         {Array.isArray(DashBoardData.activeShows) &&
         DashBoardData.activeShows.length > 0 ? (
-          DashBoardData.activeShows.map((show) => (
-            <div
-              key={show._id}
-              className="w-55 rounded-lg overflow-hidden h-full pb-3 bg-primary/10 border border-primary/20 hover:-translate-y-1 transition duration-300"
-            >
-              <img
-                src={image_base_url + show.movie.poster_path}
-                alt={show.movie?.title || "Movie Poster"}
-                className="h-60 w-full object-cover"
-              />
-              <p className="font-medium p-2 truncate">
-                {show.movie?.title || "Untitled"}
-              </p>
-              <div className="flex items-center justify-between px-2">
-                <p className="text-lg font-medium">
-                  {currency} {show.showPrice}
+          DashBoardData.activeShows
+            .filter((show) => !!show?.movie)
+            .map((show) => (
+              <div
+                key={show._id}
+                className="w-55 rounded-lg overflow-hidden h-full pb-3 bg-primary/10 border border-primary/20 hover:-translate-y-1 transition duration-300"
+              >
+                {show.movie?.poster_path ? (
+                  <img
+                    src={image_base_url + show.movie.poster_path}
+                    alt={show.movie?.title || "Movie Poster"}
+                    className="h-60 w-full object-cover"
+                  />
+                ) : (
+                  <div className="h-60 w-full bg-gray-800 flex items-center justify-center text-sm text-gray-400">
+                    No Poster
+                  </div>
+                )}
+                <p className="font-medium p-2 truncate">
+                  {show.movie?.title || "Untitled"}
                 </p>
-                <p className="flex items-center gap-1 text-sm text-gray-400 mt-1 pr-1">
-                  <StarIcon className="w-4 h-4 text-primary fill-primary" />
-                  {show.movie?.vote_average
-                    ? show.movie.vote_average.toFixed(1)
-                    : "N/A"}
+                <div className="flex items-center justify-between px-2">
+                  <p className="text-lg font-medium">
+                    {currency} {show.showPrice}
+                  </p>
+                  <p className="flex items-center gap-1 text-sm text-gray-400 mt-1 pr-1">
+                    <StarIcon className="w-4 h-4 text-primary fill-primary" />
+                    {show.movie?.vote_average
+                      ? show.movie.vote_average.toFixed(1)
+                      : "N/A"}
+                  </p>
+                </div>
+                <p className="px-2 pt-2 text-sm text-gray-500">
+                  {DateFormate(show.showDatetime)}
                 </p>
               </div>
-              <p className="px-2 pt-2 text-sm text-gray-500">
-                {DateFormate(show.showDatetime)}
-              </p>
-            </div>
-          ))
+            ))
         ) : (
           <p className="text-gray-400 text-sm">No active shows available.</p>
         )}

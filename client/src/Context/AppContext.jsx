@@ -51,15 +51,15 @@ export const AppProvider = ({ children }) => {
     try {
       const { data } = await axios.get("/api/show/all");
       if (data.success) {
-        setShows(data.shows || []);
+        const validShows = (data.shows || []).filter(show => show && (show._id || show.id));
+        setShows(validShows);
       } else {
         toast.error(data.message || "Failed to fetch shows");
         setShows([]);
       }
     } catch (error) {
-      console.error("Error fetching shows:", error);
       setShows([]);
-      toast.error("Failed to load shows");
+      toast.error("Failed to load shows. Please check your connection.");
     }
   };
 
@@ -90,15 +90,15 @@ export const AppProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    // Always fetch shows; this endpoint is public
+    fetchShows();
+    // Only admin/favorites need auth
     if (user) {
-      fetchShows();
       fetchIsAdmin();
-      fetchFavoriteMovies();
     }
+      fetchShows();
   }, [user]);
 
-  const value = {
-    axios,
     fetchIsAdmin,
     fetchShows,
     fetchFavoriteMovies,
