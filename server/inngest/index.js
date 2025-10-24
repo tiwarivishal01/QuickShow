@@ -1,8 +1,8 @@
 import { Inngest } from "inngest";
-import User from "../models/user.js";  // Change from User.js to user.js
+import User from "../models/User.js";
 import Booking from "../models/Booking.js";
-import Show from "../models/show.js";
-import sendEmail from "../config/nodemailer.js";  // Change from nodeMailer.js to nodemailer.js
+import Show from "../models/Show.js";
+import sendEmail from "../config/nodeMailer.js";
 import Movie from "../models/Movie.js";
 
 
@@ -94,7 +94,6 @@ export const cleanupOldData = inngest.createFunction(
     });
   }
 );
-
 
 
 const sendbookingEmail = inngest.createFunction(
