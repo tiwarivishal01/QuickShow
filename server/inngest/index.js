@@ -228,4 +228,4 @@ const sendNewMovieEmail = inngest.createFunction(
 )
 
 
-export const functions = [userCreated, userUpdated, userDeleted, ReleaseSeatsAndDeleteBooking, cleanupOldData, sendbookingEmail, sendNewMovieEmail];
+export const functions = [syncUserCreation, syncUserUpdation, syncUserDeletion, ReleaseSeatsAndDeleteBooking, cleanupOldData, sendbookingEmail, sendNewMovieEmail];
