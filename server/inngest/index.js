@@ -114,7 +114,7 @@ const sendBookingConfirmationMail = inngest.createFunction(
         const { bookingId } = event.data;
 
         try {
-            console.log(`sendBookingConfirmationMail triggered for bookingId: ${bookingId}`);
+            console.log(`[Email] Triggered for bookingId=${bookingId}`);
             const booking = await Booking.findById(bookingId).populate({
                 path: 'show',
                 populate: {
@@ -123,27 +123,33 @@ const sendBookingConfirmationMail = inngest.createFunction(
                 }
             }).populate('user');
 
-            if (!booking || !booking.user || !booking.show || !booking.show.movie) {
-                console.warn(`Booking or related data missing for booking ID ${bookingId}`);
+            if (!booking) {
+                console.warn(`[Email] Booking not found: ${bookingId}`);
                 return;
             }
-
+            if (!booking.user || !booking.show || !booking.show.movie) {
+                console.warn(`[Email] Missing related data for booking ${bookingId}`);
+                return;
+            }
             if (!booking.isPaid) {
-                console.warn(`Booking ${bookingId} not marked paid; skipping confirmation email.`);
+                console.warn(`[Email] Booking ${bookingId} not paid; skipping.`);
                 return;
             }
 
-            const showTime = new Date(booking.show.showDateTime).toLocaleTimeString('en-US', {
+            const showDatetime = booking.show.showDatetime; // correct field per schema
+            const showTime = new Date(showDatetime).toLocaleTimeString('en-US', {
+                timeZone: 'Asia/Kolkata'
+            });
+            const showDate = new Date(showDatetime).toLocaleDateString('en-US', {
                 timeZone: 'Asia/Kolkata'
             });
 
-            const showDate = new Date(booking.show.showDateTime).toLocaleDateString('en-US', {
-                timeZone: 'Asia/Kolkata'
-            });
+            const movieTitle = booking.show.movie.title || 'Selected Movie';
+            const poster = booking.show.movie.poster_path || '';
 
             await sendEmail({
                 to: booking.user.email,
-                subject: `Payment confirmation: '${booking.show.movie.originalTitle}' booked!`,
+                subject: `Payment confirmation: '${movieTitle}' booked!`,
                 body: `
         <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
           <div style="background-color: #7b2cbf; color: white; padding: 20px; text-align: center;">
@@ -152,7 +158,7 @@ const sendBookingConfirmationMail = inngest.createFunction(
 
           <div style="padding: 24px; font-size: 16px; color: #333;">
             <h2 style="margin-top: 0;">Hi ${booking.user.name},</h2>
-            <p>Your booking for <strong style="color: #7b2cbf;">"${booking.show.movie.originalTitle}"</strong> is confirmed.</p>
+            <p>Your booking for <strong style="color: #7b2cbf;">"${movieTitle}"</strong> is confirmed.</p>
 
             <p>
               <strong>Date:</strong> ${showDate}<br>
@@ -163,7 +169,7 @@ const sendBookingConfirmationMail = inngest.createFunction(
 
             <p>🎬 Enjoy the show and don’t forget to grab your popcorn!</p>
           </div>
-          <img src="${booking.show.movie.primaryImage}" alt="${booking.show.movie.originalTitle} Poster" style="width: 100%; max-height: 350px; object-fit: cover; border-radius: 4px; margin-top: 16px;" />
+          ${poster ? `<img src="${poster}" alt="${movieTitle} Poster" style="width: 100%; max-height: 350px; object-fit: cover; border-radius: 4px; margin-top: 16px;" />` : ''}
 
           <div style="background-color: #f5f5f5; color: #777; padding: 16px; text-align: center; font-size: 14px;">
             <p style="margin: 0;">Thanks for booking with us!<br>— The QuickShow Team</p>
@@ -172,6 +178,7 @@ const sendBookingConfirmationMail = inngest.createFunction(
         </div>`
             });
 
+            console.log(`[Email] Sent confirmation for bookingId=${bookingId}`);
         } catch (error) {
             console.error("Error in sendBookingConfirmationMail function:", error);
         }
