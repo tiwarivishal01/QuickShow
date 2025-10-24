@@ -83,28 +83,47 @@ const ReleaseSeatsAndDeleteBooking = inngest.createFunction(
 
 const sendBookingConfirmationMail = inngest.createFunction(
   { id: 'send-booking-confirmation-mail' },
-  { event: 'app/show.booked' },
+  { event: 'app/checkpayment' }, // Changed from 'app/show.booked' to 'app/checkpayment'
   async ({ event, step }) => {
     const { bookingId } = event.data;
-    const booking = await Booking.findById(bookingId)
-      .populate({
-        path: 'show',
-        populate: {
-          path: 'movie',
-          model: 'Movie'
-        }
-      }).populate('user');
-
-      await sendEmail({
-        to: booking.user.email,
-        subject: `Booking Confirmation for ${booking.show.movie.title}`,
-        body:  `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden"><div style="background:#1f2937;color:#fff;padding:20px;text-align:center"><h1>🎬 Booking Confirmed!</h1></div><div style="padding:30px"><h2>Hi ${booking.user.name},</h2><p>Your movie ticket booking has been confirmed:</p><div style="background:#f8f9fa;padding:20px;border-radius:6px;margin:20px 0"><h3>${booking.show.movie.title}</h3><p><strong>Date:</strong> ${new Date(booking.show.showDatetime).toLocaleDateString()}</p><p><strong>Time:</strong> ${new Date(booking.show.showDatetime).toLocaleTimeString()}</p></div><div style="border-left:4px solid #3b82f6;padding-left:15px;margin:20px 0"><p><strong>Booking ID:</strong> ${booking._id}</p><p><strong>Amount:</strong> $${booking.amount}</p><p><strong>Seats:</strong> ${booking.bookedSeats.join(', ')}</p></div><p>Enjoy your movie!</p></div></div>`
-
-      })
     
-    if (booking && booking.user) {
-      console.log(`Booking confirmation for ${booking.user.email}`);
-    }
+    // Wait for payment to be confirmed (check every 30 seconds for up to 15 minutes)
+    await step.run('wait-for-payment-confirmation', async () => {
+      const maxWaitTime = 15 * 60 * 1000; // 15 minutes
+      const checkInterval = 30 * 1000; // 30 seconds
+      const startTime = Date.now();
+      
+      while (Date.now() - startTime < maxWaitTime) {
+        const booking = await Booking.findById(bookingId);
+        
+        if (booking && booking.isPaid) {
+          // Payment confirmed, send email
+          const populatedBooking = await Booking.findById(bookingId)
+            .populate({
+              path: 'show',
+              populate: {
+                path: 'movie',
+                model: 'Movie'
+              }
+            }).populate('user');
+
+          await sendEmail({
+            to: populatedBooking.user.email,
+            subject: `Booking Confirmation for ${populatedBooking.show.movie.title}`,
+            body: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden"><div style="background:#1f2937;color:#fff;padding:20px;text-align:center"><h1>🎬 Booking Confirmed!</h1></div><div style="padding:30px"><h2>Hi ${populatedBooking.user.name},</h2><p>Your movie ticket booking has been confirmed:</p><div style="background:#f8f9fa;padding:20px;border-radius:6px;margin:20px 0"><h3>${populatedBooking.show.movie.title}</h3><p><strong>Date:</strong> ${new Date(populatedBooking.show.showDatetime).toLocaleDateString()}</p><p><strong>Time:</strong> ${new Date(populatedBooking.show.showDatetime).toLocaleTimeString()}</p></div><div style="border-left:4px solid #3b82f6;padding-left:15px;margin:20px 0"><p><strong>Booking ID:</strong> ${populatedBooking._id}</p><p><strong>Amount:</strong> $${populatedBooking.amount}</p><p><strong>Seats:</strong> ${populatedBooking.bookedSeats.join(', ')}</p></div><p>Enjoy your movie!</p></div></div>`
+          });
+          
+          console.log(`Booking confirmation email sent to ${populatedBooking.user.email} for booking ${bookingId}`);
+          return; // Exit the function after sending email
+        }
+        
+        // Wait before checking again
+        await new Promise(resolve => setTimeout(resolve, checkInterval));
+      }
+      
+      // If we reach here, payment wasn't confirmed within the time limit
+      console.log(`Payment not confirmed within 15 minutes for booking ${bookingId}, email not sent`);
+    });
   }
 );
 
