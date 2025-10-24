@@ -137,7 +137,7 @@ const sendBookingConfirmationMail = inngest.createFunction(
                 const userData = await User.findById(bookingData.user);
                 if (userData) {
                     bookingData.user = userData;
-                    console.log(`[Email] User data found: ${userData.name} (${userData.email})`);
+                    console.log(`[Email] User data found:`, JSON.stringify(userData, null, 2));
                 } else {
                     console.error(`[Email] User not found for ID: ${bookingData.user}`);
                 }
