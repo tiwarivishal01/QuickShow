@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import Booking from '../models/Booking.js';
 
 export const stripeWebhooks = async (req, res) => {
+  console.log('Stripe webhook received');
   const stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY);
   const sig = req.headers['stripe-signature'];
 
@@ -13,16 +14,19 @@ export const stripeWebhooks = async (req, res) => {
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
+    console.log('Webhook signature verified');
   } catch (error) {
     console.error('Webhook signature verification failed:', error.message);
     return res.status(400).send(`Webhook Error: ${error.message}`);
   }
 
   try {
+    console.log('Event type:', event.type);
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object;
         const bookingId = session?.metadata?.bookingId;
+        console.log('Booking ID from metadata:', bookingId);
         if (bookingId) {
           await Booking.findByIdAndUpdate(bookingId, {
             isPaid: true,
@@ -30,15 +34,13 @@ export const stripeWebhooks = async (req, res) => {
           }
           )
           //send comnfirmation mail
+          console.log('Sending app/show.booked event for booking ID:', bookingId);
           await inngest.send({
             name: 'app/show.booked',
             data: {
               bookingId
             }
           })
-
-
-
 
           console.log(`Booking ${bookingId} marked as paid via checkout.session.completed.`);
         } else {
