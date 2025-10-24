@@ -58,7 +58,7 @@ const ReleaseSeatsAndDeleteBooking = inngest.createFunction(
   { id: 'release-seat-delete-booking'},
   { event: "app/checkpayment" },
   async({ event, step })=>{
-    const tenMinuteslater = new Date(Date.now()+10*60*1000);
+    const tenMinuteslater = new Date(Date.now()+2*60*1000);  //making sleep for 2 mint as test
     await step.sleepUntil('wait-for-10-minutes', tenMinuteslater);
 
     await step.run('check-payment-status', async()=>{
