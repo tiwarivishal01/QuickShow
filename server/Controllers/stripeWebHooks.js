@@ -23,31 +23,6 @@ export const stripeWebhooks = async (req, res) => {
   try {
     console.log('Event type:', event.type);
     switch (event.type) {
-      case 'checkout.session.completed': {
-        const session = event.data.object;
-        const bookingId = session?.metadata?.bookingId;
-        console.log('Booking ID from metadata:', bookingId);
-        if (bookingId) {
-          await Booking.findByIdAndUpdate(bookingId, {
-            isPaid: true,
-            paymentLink: '',
-          }
-          )
-          //send comnfirmation mail
-          console.log('Sending app/show.booked event for booking ID:', bookingId);
-          await inngest.send({
-            name: 'app/show.booked',
-            data: {
-              bookingId
-            }
-          })
-
-          console.log(`Booking ${bookingId} marked as paid via checkout.session.completed.`);
-        } else {
-          console.warn('No bookingId in session metadata');
-        }
-        break;
-      }
       case 'payment_intent.succeeded': {
         // Fallback in case you rely on payment_intent events
         const paymentIntent = event.data.object;
@@ -61,7 +36,18 @@ export const stripeWebhooks = async (req, res) => {
             await Booking.findByIdAndUpdate(bookingId, {
               isPaid: true,
               paymentLink: '',
+            })
+            //send confirmation email
+            await inngest.send({
+              name: 'app/show.booked',
+              data: {
+                bookingId: bookingId,
+              },
             });
+  
+
+
+
             console.log(`✅ Booking ${bookingId} marked as paid via payment_intent.succeeded.`);
           }
         } catch (e) {
