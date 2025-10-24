@@ -114,6 +114,7 @@ export const createBooking = async (req, res) => {
                     bookingId: booking._id.toString()
                 }
             })
+           
 
             res.json({ success: true, booking, url: session.url });
         } catch (stripeError) {
@@ -144,7 +145,14 @@ export const confirmStripeSession = async (req, res) => {
                 isPaid: true,
                 paymentLink: ''
             });
+            await inngest.send({
+            name: 'app/show.booked',
+            data: {
+              bookingId
+            }
+          })
             return res.json({ success: true, message: 'Payment confirmed', bookingId });
+            
         }
         return res.json({ success: false, message: 'Payment not completed yet' });
     } catch (error) {
