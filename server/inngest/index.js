@@ -3,6 +3,7 @@ import User from "../models/user.js";
 import Booking from "../models/Booking.js";
 import Show from "../models/show.js";
 import Movie from "../models/Movie.js";
+import sendEmail from "../config/nodeMailer.js";
 
 
 // Create a client to send and receive events
@@ -106,13 +107,14 @@ export const cleanupOldData = inngest.createFunction(
     }
 );
 
-const sendbookingEmail = inngest.createFunction(
+const sendBookingConfirmationMail = inngest.createFunction(
     { id: "send-booking-confirmation-mail" },
     { event: 'app/show.booked' },
     async ({ event }) => {
         const { bookingId } = event.data;
 
         try {
+            console.log(`sendBookingConfirmationMail triggered for bookingId: ${bookingId}`);
             const booking = await Booking.findById(bookingId).populate({
                 path: 'show',
                 populate: {
@@ -123,6 +125,11 @@ const sendbookingEmail = inngest.createFunction(
 
             if (!booking || !booking.user || !booking.show || !booking.show.movie) {
                 console.warn(`Booking or related data missing for booking ID ${bookingId}`);
+                return;
+            }
+
+            if (!booking.isPaid) {
+                console.warn(`Booking ${bookingId} not marked paid; skipping confirmation email.`);
                 return;
             }
 
@@ -152,7 +159,7 @@ const sendbookingEmail = inngest.createFunction(
               <strong>Time:</strong> ${showTime}
             </p>
             <p><strong>Booking ID:</strong> <span style="color: #7b2cbf;">${booking._id}</span></p>
-            <p><strong>Seats:</strong> ${booking.bookedseats?.join(', ') || 'N/A'}</p>
+            <p><strong>Seats:</strong> ${booking.bookedSeats?.join(', ') || 'N/A'}</p>
 
             <p>🎬 Enjoy the show and don’t forget to grab your popcorn!</p>
           </div>
@@ -166,7 +173,7 @@ const sendbookingEmail = inngest.createFunction(
             });
 
         } catch (error) {
-            console.error("Error in sendbookingEmail function:", error);
+            console.error("Error in sendBookingConfirmationMail function:", error);
         }
     }
 );
@@ -221,4 +228,4 @@ const sendNewMovieEmail = inngest.createFunction(
 )
 
 
-export const functions = [syncUserCreation, syncUserUpdation, syncUserDeletion, ReleaseSeatsAndDeleteBooking, cleanupOldData, sendbookingEmail, sendNewMovieEmail];
+export const functions = [syncUserCreation, syncUserUpdation, syncUserDeletion, ReleaseSeatsAndDeleteBooking, cleanupOldData, sendBookingConfirmationMail, sendNewMovieEmail];
