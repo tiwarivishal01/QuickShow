@@ -110,10 +110,10 @@ export const cleanupOldData = inngest.createFunction(
 const sendBookingConfirmationMail = inngest.createFunction(
     { id: "send-booking-confirmation-mail" },
     { event: 'app/show.booked' },
-    async ({ event }) => {
+    async ({ event, step }) => {
         const { bookingId } = event.data;
 
-        try {
+        return await step.run('send-confirmation-email', async () => {
             console.log(`[Email] Triggered for bookingId=${bookingId}`);
             const booking = await Booking.findById(bookingId).populate({
                 path: 'show',
@@ -125,15 +125,15 @@ const sendBookingConfirmationMail = inngest.createFunction(
 
             if (!booking) {
                 console.warn(`[Email] Booking not found: ${bookingId}`);
-                return;
+                return { error: 'Booking not found' };
             }
             if (!booking.user || !booking.show || !booking.show.movie) {
                 console.warn(`[Email] Missing related data for booking ${bookingId}`);
-                return;
+                return { error: 'Missing related data' };
             }
             if (!booking.isPaid) {
                 console.warn(`[Email] Booking ${bookingId} not paid; skipping.`);
-                return;
+                return { error: 'Booking not paid' };
             }
 
             const showDatetime = booking.show.showDatetime; // correct field per schema
@@ -179,9 +179,8 @@ const sendBookingConfirmationMail = inngest.createFunction(
             });
 
             console.log(`[Email] Sent confirmation for bookingId=${bookingId}`);
-        } catch (error) {
-            console.error("Error in sendBookingConfirmationMail function:", error);
-        }
+            return { success: true, bookingId };
+        });
     }
 );
 
