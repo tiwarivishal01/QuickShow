@@ -111,45 +111,65 @@ const sendBookingConfirmationMail = inngest.createFunction(
     { id: "send-booking-confirmation-mail" },
     { event: 'app/show.booked' },
       async ({event, step}) =>{
-        const {bookingId} = event.data;
-        const booking = await Booking.findById(bookingId).populate({
-            path: 'show',
-            populate: {
-                path: 'movie',
-                model: 'Movie'
-            }
-        }).populate('user');
+        const { bookingId } = event.data;
+        
+        const booking = await Booking.findById(bookingId)
+            .populate({
+                path: 'show',
+                populate: {
+                    path: 'movie',
+                    model: 'Movie'
+                }
+            })
+            .populate('user');
 
-        await sendEmail({
-            to: booking.user.email,
-            subject: 'Booking Confirmation',
-            body: `
+        if (!booking || !booking.user || !booking.show || !booking.show.movie) {
+            console.error(`Could not send confirmation. Booking or related data not found for bookingId: ${bookingId}`);
+            return { error: "Booking, user, or show data not found." };
+        }
+
+        const movieTitle = booking.show.movie.originalTitle;
+        const showDateTime = new Date(booking.show.showDateTime);
+        const showDate = showDateTime.toLocaleDateString();
+        const showTime = showDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const poster = booking.show.movie.primaryImage;
+
+        try {
+            await sendEmail({
+                to: booking.user.email,
+                subject: 'Booking Confirmation',
+                body: `
         <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
           <div style="background-color: #7b2cbf; color: white; padding: 20px; text-align: center;">
             <h1 style="margin: 0;">🎟️ QuickShow Booking Confirmed!</h1>
           </div>
 
           <div style="padding: 24px; font-size: 16px; color: #333;">
-            <h2 style="margin-top: 0;">Hi ${booking.user.name},</h2>
+            <h2 style="margin-top: 0;">Hi ${booking.user.name || 'there'},</h2>
             <p>Your booking for <strong style="color: #7b2cbf;">"${movieTitle}"</strong> is confirmed.</p>
 
             <p>
               <strong>Date:</strong> ${showDate}<br>
               <strong>Time:</strong> ${showTime}
             </p>
-            <p><strong>Booking ID:</strong> <span style="color: #7b2cbf;">${booking._id}</span></p>
+            <p><strong>Booking ID:</strong> <span style="color: #7b2cbf;">${booking.id}</span></p>
             <p><strong>Seats:</strong> ${booking.bookedSeats?.join(', ') || 'N/A'}</p>
 
             <p>🎬 Enjoy the show and don’t forget to grab your popcorn!</p>
           </div>
-          ${poster ? `<img src="${poster}" alt="${movieTitle} Poster" style="width: 100%; max-height: 350px; object-fit: cover; border-radius: 4px; margin-top: 16px;" />` : ''}
+          ${poster ? `<img src="${poster}" alt="${movieTitle} Poster" style="width: 100%; max-height: 350px; object-fit: cover; border-top: 1px solid #e0e0e0; border-bottom: 1px solid #e0e0e0;" />` : ''}
 
           <div style="background-color: #f5f5f5; color: #777; padding: 16px; text-align: center; font-size: 14px;">
             <p style="margin: 0;">Thanks for booking with us!<br>— The QuickShow Team</p>
             <p style="margin: 4px 0 0;">📍 Visit us: <a href="https://quickshow-ecru.vercel.app" style="color: #7b2cbf; text-decoration: none;">QuickShow</a></p>
           </div>
         </div>`
-        })
+            });
+            return { success: true, message: `Confirmation email sent for booking ${bookingId}` };
+        } catch (error) {
+            console.error(`Failed to send email for bookingId: ${bookingId}`, error);
+            return { error: "Failed to send email." };
+        }
       }
 );
 
