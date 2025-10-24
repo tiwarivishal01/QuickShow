@@ -11,99 +11,99 @@ export const inngest = new Inngest({ id: "movie-ticket-booking" });
 
 //inngest fn to dsave userdata in db
 const syncUserCreation = inngest.createFunction(
-   { id: "sync_user_from_clerk" },
-  { event: 'clerk/user.created' },
-  async ({ event }) => {
-    const { id, first_name, last_name, email_addresses, image_url } = event.data;
+    { id: "sync_user_from_clerk" },
+    { event: 'clerk/user.created' },
+    async ({ event }) => {
+        const { id, first_name, last_name, email_addresses, image_url } = event.data;
 
-    const userData = {
-      _id: id,
-      email: email_addresses[0].email_address,          // full email
-      name: `${first_name} ${last_name}`,
-      image: image_url,
-    };
-    console.log(userData)
-    await User.create(userData);
-  }
+        const userData = {
+            _id: id,
+            email: email_addresses[0].email_address,          // full email
+            name: `${first_name} ${last_name}`,
+            image: image_url,
+        };
+        console.log(userData)
+        await User.create(userData);
+    }
 );
 
 //inngest fn to delete user from db
 const syncUserDeletion = inngest.createFunction(
-  { id: "delete-user-from-clerk" },
-  { event: "clerk/user.deleted" },
-  async ({ event }) => {
-    const { id } = event.data;
-    await User.findByIdAndDelete(id);
-  }
+    { id: "delete-user-from-clerk" },
+    { event: "clerk/user.deleted" },
+    async ({ event }) => {
+        const { id } = event.data;
+        await User.findByIdAndDelete(id);
+    }
 );
 
 //inngest fn to update user in mongodb db
 const syncUserUpdation = inngest.createFunction(
-  { id: "update-user-from-clerk" },
-  { event: "clerk/user.updated" },
-  async ({ event }) => {
-    const { id, first_name, last_name, email_addresses, image_url } = event.data;
-    const userData = {
-      _id: id,
-      email: email_addresses[0].email_address,
-      name: first_name + " " + last_name,
-      image: image_url,
-    };
-    await User.findByIdAndUpdate(id, userData);
-  }
+    { id: "update-user-from-clerk" },
+    { event: "clerk/user.updated" },
+    async ({ event }) => {
+        const { id, first_name, last_name, email_addresses, image_url } = event.data;
+        const userData = {
+            _id: id,
+            email: email_addresses[0].email_address,
+            name: first_name + " " + last_name,
+            image: image_url,
+        };
+        await User.findByIdAndUpdate(id, userData);
+    }
 );
 
 //inngest fn to cancel booking and release seat after 10 mint of booking if payment isnt made
 const ReleaseSeatsAndDeleteBooking = inngest.createFunction(
-  { id: 'release-seat-delete-booking'},
-  { event: "app/checkpayment" },
-  async({ event, step })=>{
-    const tenMinuteslater = new Date(Date.now()+2*60*1000);  //making sleep for 2 mint as test
-    await step.sleepUntil('wait-for-10-minutes', tenMinuteslater);
+    { id: 'release-seat-delete-booking' },
+    { event: "app/checkpayment" },
+    async ({ event, step }) => {
+        const tenMinuteslater = new Date(Date.now() + 2 * 60 * 1000);  //making sleep for 2 mint as test
+        await step.sleepUntil('wait-for-10-minutes', tenMinuteslater);
 
-    await step.run('check-payment-status', async()=>{
-      const bookingId = event.data.bookingId;
-      const booking = await Booking.findById(bookingId);
+        await step.run('check-payment-status', async () => {
+            const bookingId = event.data.bookingId;
+            const booking = await Booking.findById(bookingId);
 
-      //if payment not made thn deleting booking and releasing the seat
-      if(!booking.isPaid){
-        const show = await Show.findById(booking.show);
-        booking.bookedSeats.forEach((seat)=>{
-          delete show.occupiedSeat[seat]
+            //if payment not made thn deleting booking and releasing the seat
+            if (!booking.isPaid) {
+                const show = await Show.findById(booking.show);
+                booking.bookedSeats.forEach((seat) => {
+                    delete show.occupiedSeat[seat]
+                })
+                show.markModified('occupiedSeat')
+                await show.save()
+                await Booking.findByIdAndDelete(booking._id)
+            }
         })
-        show.markModified('occupiedSeat')
-        await show.save()
-        await Booking.findByIdAndDelete(booking._id)
-      }
     })
-  })
 
 export const cleanupOldData = inngest.createFunction(
-  { id: "cleanup-old-bookings-shows" },
-  { cron: "0 0 1 1,7 *" }, // Runs at 00:00 on Jan 1 and Jul 1
-  async ({ step }) => {
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    { id: "cleanup-old-bookings-shows" },
+    { cron: "0 0 1 1,7 *" }, // Runs at 00:00 on Jan 1 and Jul 1
+    async ({ step }) => {
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-    return step.run("delete-old-bookings-and-shows", async () => {
-      const deletedBookings = await Booking.deleteMany({
-        createdAt: { $lt: sixMonthsAgo },
-      });
+        return step.run("delete-old-bookings-and-shows", async () => {
+            const deletedBookings = await Booking.deleteMany({
+                createdAt: { $lt: sixMonthsAgo },
+            });
 
-      const deletedShows = await Show.deleteMany({
-        showDateTime: { $lt: sixMonthsAgo },
-      });
+            const deletedShows = await Show.deleteMany({
+                showDateTime: { $lt: sixMonthsAgo },
+            });
 
-      console.log(
-        `Deleted ${deletedBookings.deletedCount} old bookings and ${deletedShows.deletedCount} shows.`
-      );
+            console.log(
+                `Deleted ${deletedBookings.deletedCount} old bookings and ${deletedShows.deletedCount} shows.`
+            );
 
-      return {
-        deletedBookings: deletedBookings.deletedCount,
-        deletedShows: deletedShows.deletedCount,
-      };
-    });
-  }
+            return {
+                deletedBookings: deletedBookings.deletedCount,
+                deletedShows: deletedShows.deletedCount,
+            };
+        });
+    }
 );
 
 const sendbookingEmail = inngest.createFunction(
@@ -179,7 +179,7 @@ const sendNewMovieEmail = inngest.createFunction(
         const users = await User.find({});
         const movie = await Movie.findById(movieId);
 
-        if(!movie) return "No movie found";
+        if (!movie) return "No movie found";
 
         for (const user of users) {
             const userEmail = user.email;
@@ -211,12 +211,12 @@ const sendNewMovieEmail = inngest.createFunction(
             </div>`
 
             await sendEmail({
-                to : userEmail,
+                to: userEmail,
                 subject,
                 body,
             })
         }
-        return {message : 'Notification sent'}
+        return { message: 'Notification sent' }
     }
 )
 
