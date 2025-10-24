@@ -110,47 +110,20 @@ export const cleanupOldData = inngest.createFunction(
 const sendBookingConfirmationMail = inngest.createFunction(
     { id: "send-booking-confirmation-mail" },
     { event: 'app/show.booked' },
-    async ({ event, step }) => {
-        const { bookingId } = event.data;
-
-        return await step.run('send-confirmation-email', async () => {
-            console.log(`[Email] Triggered for bookingId=${bookingId}`);
-            const booking = await Booking.findById(bookingId).populate({
-                path: 'show',
-                populate: {
-                    path: 'movie',
-                    model: 'Movie'
-                }
-            }).populate('user');
-
-            if (!booking) {
-                console.warn(`[Email] Booking not found: ${bookingId}`);
-                return { error: 'Booking not found' };
+      async ({event, step}) =>{
+        const {bookingId} = event.data;
+        const booking = await Booking.findById(bookingId).populate({
+            path: 'show',
+            populate: {
+                path: 'movie',
+                model: 'Movie'
             }
-            if (!booking.user || !booking.show || !booking.show.movie) {
-                console.warn(`[Email] Missing related data for booking ${bookingId}`);
-                return { error: 'Missing related data' };
-            }
-            if (!booking.isPaid) {
-                console.warn(`[Email] Booking ${bookingId} not paid; skipping.`);
-                return { error: 'Booking not paid' };
-            }
+        }).populate('user');
 
-            const showDatetime = booking.show.showDatetime; // correct field per schema
-            const showTime = new Date(showDatetime).toLocaleTimeString('en-US', {
-                timeZone: 'Asia/Kolkata'
-            });
-            const showDate = new Date(showDatetime).toLocaleDateString('en-US', {
-                timeZone: 'Asia/Kolkata'
-            });
-
-            const movieTitle = booking.show.movie.title || 'Selected Movie';
-            const poster = booking.show.movie.poster_path || '';
-
-            await sendEmail({
-                to: booking.user.email,
-                subject: `Payment confirmation: '${movieTitle}' booked!`,
-                body: `
+        await sendEmail({
+            to: booking.user.email,
+            subject: 'Booking Confirmation',
+            body: `
         <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
           <div style="background-color: #7b2cbf; color: white; padding: 20px; text-align: center;">
             <h1 style="margin: 0;">🎟️ QuickShow Booking Confirmed!</h1>
@@ -176,12 +149,8 @@ const sendBookingConfirmationMail = inngest.createFunction(
             <p style="margin: 4px 0 0;">📍 Visit us: <a href="https://quickshow-ecru.vercel.app" style="color: #7b2cbf; text-decoration: none;">QuickShow</a></p>
           </div>
         </div>`
-            });
-
-            console.log(`[Email] Sent confirmation for bookingId=${bookingId}`);
-            return { success: true, bookingId };
-        });
-    }
+        })
+      }
 );
 
 const sendNewMovieEmail = inngest.createFunction(

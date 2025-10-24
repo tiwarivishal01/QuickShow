@@ -44,12 +44,14 @@ export const stripeWebhooks = async (req, res) => {
               paymentLink: '',
             })
             //send confirmation email
+            console.log(`[WEBHOOK] Sending Inngest event for bookingId: ${bookingId}`);
             await inngest.send({
               name: 'app/show.booked',
               data: {
                 bookingId: bookingId,
               },
             });
+            console.log(`[WEBHOOK] Inngest event sent successfully for bookingId: ${bookingId}`);
   
 
 
