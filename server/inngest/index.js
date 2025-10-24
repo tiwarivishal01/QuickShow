@@ -178,6 +178,13 @@ const sendBookingConfirmationMail = inngest.createFunction(
             return { error: "Booking not paid." };
         }
 
+        if (!booking.user.email) {
+            console.error(`[Email] User email not found for bookingId: ${bookingId}`);
+            return { error: "User email not found." };
+        }
+
+        console.log(`[Email] Sending email to: ${booking.user.email}`);
+
         const movieTitle = booking.show.movie.title;
         const showDateTime = new Date(booking.show.showDatetime);
         const showDate = showDateTime.toLocaleDateString();
