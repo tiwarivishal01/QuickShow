@@ -16,7 +16,6 @@ const app = express()
 const port = 3000;
 await connectdb();
 
-// webhook endpoint
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), stripeWebhooks)
 
 

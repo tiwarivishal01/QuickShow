@@ -5,6 +5,11 @@ import Booking from '../models/Booking.js';
 export const stripeWebhooks = async (req, res) => {
   console.log('Stripe webhook received');
   
+  if (Booking.db.readyState !== 1) {
+    console.error('Database not connected');
+    return res.status(503).json({ error: 'Database unavailable' });
+  }
+  
   if (!process.env.STRIPE_SECRET_KEY) {
     console.error('Stripe secret key not configured');
     return res.status(500).json({ error: 'Payment service not configured' });
