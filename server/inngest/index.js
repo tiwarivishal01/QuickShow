@@ -114,27 +114,34 @@ const sendBookingConfirmationMail = inngest.createFunction(
         const { bookingId } = event.data;
         
         const booking = await step.run('fetch-booking-data', async () => {
-            return await Booking.findById(bookingId)
+            const bookingData = await Booking.findById(bookingId)
                 .populate({
                     path: 'show',
                     populate: {
                         path: 'movie',
                         model: 'Movie'
                     }
-                })
-                .populate('user');
+                });
+            
+            if (bookingData && bookingData.user) {
+                const userData = await User.findById(bookingData.user);
+                bookingData.user = userData;
+            }
+            
+            return bookingData;
         });
 
         if (!booking || !booking.user || !booking.show || !booking.show.movie) {
             console.error(`Could not send confirmation. Booking or related data not found for bookingId: ${bookingId}`);
+            console.log('Booking data:', JSON.stringify(booking, null, 2));
             return { error: "Booking, user, or show data not found." };
         }
 
-        const movieTitle = booking.show.movie.originalTitle;
-        const showDateTime = new Date(booking.show.showDateTime);
+        const movieTitle = booking.show.movie.title;
+        const showDateTime = new Date(booking.show.showDatetime);
         const showDate = showDateTime.toLocaleDateString();
         const showTime = showDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const poster = booking.show.movie.primaryImage;
+        const poster = booking.show.movie.poster_path;
 
         return await step.run('send-confirmation-email', async () => {
             await sendEmail({
