@@ -1,7 +1,7 @@
 import { Inngest } from "inngest";
-import User from "../models/User.js";
+import User from "../models/user.js";
 import Booking from "../models/Booking.js";
-import Show from "../models/Show.js";
+import Show from "../models/show.js";
 import sendEmail from "../config/nodeMailer.js";
 import Movie from "../models/Movie.js";
 
