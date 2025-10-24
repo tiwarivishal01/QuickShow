@@ -46,11 +46,10 @@ const userDeleted = inngest.createFunction(
 )
 
 const releaseSeatsandDeletebooking = inngest.createFunction(
-    { id: 'relese-seats-delete-booking' },
+    { id: 'release-seat-delete-booking' },
     { event: 'app/checkpayment' },
     async ({ event, step }) => {
-        const tenminutes = new Date(Date.now() + 10 * 60 * 1000);
-        await step.sleepUntil('Wait-for-10-minutes', tenminutes);
+        await step.sleep('Wait-for-10-minutes', '10m');
         await step.run('check-payment-status', async () => {
             const bookingId = event.data.bookingId;
             const booking = await Booking.findById(bookingId);
