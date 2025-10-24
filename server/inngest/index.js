@@ -113,15 +113,17 @@ const sendBookingConfirmationMail = inngest.createFunction(
       async ({event, step}) =>{
         const { bookingId } = event.data;
         
-        const booking = await Booking.findById(bookingId)
-            .populate({
-                path: 'show',
-                populate: {
-                    path: 'movie',
-                    model: 'Movie'
-                }
-            })
-            .populate('user');
+        const booking = await step.run('fetch-booking-data', async () => {
+            return await Booking.findById(bookingId)
+                .populate({
+                    path: 'show',
+                    populate: {
+                        path: 'movie',
+                        model: 'Movie'
+                    }
+                })
+                .populate('user');
+        });
 
         if (!booking || !booking.user || !booking.show || !booking.show.movie) {
             console.error(`Could not send confirmation. Booking or related data not found for bookingId: ${bookingId}`);
@@ -134,7 +136,7 @@ const sendBookingConfirmationMail = inngest.createFunction(
         const showTime = showDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const poster = booking.show.movie.primaryImage;
 
-        try {
+        return await step.run('send-confirmation-email', async () => {
             await sendEmail({
                 to: booking.user.email,
                 subject: 'Booking Confirmation',
@@ -166,10 +168,7 @@ const sendBookingConfirmationMail = inngest.createFunction(
         </div>`
             });
             return { success: true, message: `Confirmation email sent for booking ${bookingId}` };
-        } catch (error) {
-            console.error(`Failed to send email for bookingId: ${bookingId}`, error);
-            return { error: "Failed to send email." };
-        }
+        });
       }
 );
 
