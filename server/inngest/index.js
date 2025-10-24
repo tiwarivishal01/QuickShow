@@ -110,10 +110,12 @@ export const cleanupOldData = inngest.createFunction(
 const sendBookingConfirmationMail = inngest.createFunction(
     { id: "send-booking-confirmation-mail" },
     { event: 'app/show.booked' },
-      async ({event, step}) =>{
+    async ({ event, step }) => {
         const { bookingId } = event.data;
-        
+
         const booking = await step.run('fetch-booking-data', async () => {
+            console.log(`[Email] Fetching booking data for bookingId: ${bookingId}`);
+
             const bookingData = await Booking.findById(bookingId)
                 .populate({
                     path: 'show',
@@ -122,19 +124,58 @@ const sendBookingConfirmationMail = inngest.createFunction(
                         model: 'Movie'
                     }
                 });
-            
-            if (bookingData && bookingData.user) {
-                const userData = await User.findById(bookingData.user);
-                bookingData.user = userData;
+
+            if (!bookingData) {
+                console.error(`[Email] Booking not found: ${bookingId}`);
+                return null;
             }
-            
+
+            console.log(`[Email] Booking found. User ID: ${bookingData.user}`);
+
+            // Fetch user data separately since user field is a string (Clerk ID), not ObjectId
+            if (bookingData.user) {
+                const userData = await User.findById(bookingData.user);
+                if (userData) {
+                    bookingData.user = userData;
+                    console.log(`[Email] User data found: ${userData.name} (${userData.email})`);
+                } else {
+                    console.error(`[Email] User not found for ID: ${bookingData.user}`);
+                }
+            }
+
             return bookingData;
         });
 
-        if (!booking || !booking.user || !booking.show || !booking.show.movie) {
-            console.error(`Could not send confirmation. Booking or related data not found for bookingId: ${bookingId}`);
-            console.log('Booking data:', JSON.stringify(booking, null, 2));
-            return { error: "Booking, user, or show data not found." };
+        console.log('[Email] Data check results:');
+        console.log('- Booking exists:', !!booking);
+        console.log('- User exists:', !!booking?.user);
+        console.log('- Show exists:', !!booking?.show);
+        console.log('- Movie exists:', !!booking?.show?.movie);
+        console.log('- Is paid:', booking?.isPaid);
+
+        if (!booking) {
+            console.error(`[Email] Booking not found for bookingId: ${bookingId}`);
+            return { error: "Booking not found." };
+        }
+
+        if (!booking.user) {
+            console.error(`[Email] User data not found for bookingId: ${bookingId}`);
+            return { error: "User data not found." };
+        }
+
+        if (!booking.show) {
+            console.error(`[Email] Show data not found for bookingId: ${bookingId}`);
+            return { error: "Show data not found." };
+        }
+
+        if (!booking.show.movie) {
+            console.error(`[Email] Movie data not found for bookingId: ${bookingId}`);
+            return { error: "Movie data not found." };
+        }
+
+        if (!booking.isPaid) {
+            console.warn(`[Email] Booking ${bookingId} not paid yet; skipping email.`);
+            return { error: "Booking not paid." };
         }
 
         const movieTitle = booking.show.movie.title;
@@ -176,7 +217,7 @@ const sendBookingConfirmationMail = inngest.createFunction(
             });
             return { success: true, message: `Confirmation email sent for booking ${bookingId}` };
         });
-      }
+    }
 );
 
 const sendNewMovieEmail = inngest.createFunction(
