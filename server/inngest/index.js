@@ -5,10 +5,8 @@ import Show from "../models/show.js";
 import Movie from "../models/Movie.js";
 
 
-
 // Create a client to send and receive events
 export const inngest = new Inngest({ id: "movie-ticket-booking" });
-
 
 
 //inngest fn to dsave userdata in db
@@ -57,10 +55,8 @@ const syncUserUpdation = inngest.createFunction(
 );
 
 //inngest fn to cancel booking and release seat after 10 mint of booking if payment isnt made
-
 const ReleaseSeatsAndDeleteBooking = inngest.createFunction(
   { id: 'release-seat-delete-booking'},
-
   { event: "app/checkpayment" },
   async({ event, step })=>{
     const tenMinuteslater = new Date(Date.now()+10*60*1000);
@@ -71,7 +67,6 @@ const ReleaseSeatsAndDeleteBooking = inngest.createFunction(
       const booking = await Booking.findById(bookingId);
 
       //if payment not made thn deleting booking and releasing the seat
-
       if(!booking.isPaid){
         const show = await Show.findById(booking.show);
         booking.bookedSeats.forEach((seat)=>{
@@ -111,7 +106,6 @@ export const cleanupOldData = inngest.createFunction(
     });
   }
 );
-
 
 const sendbookingEmail = inngest.createFunction(
     { id: "send-booking-confirmation-mail" },
