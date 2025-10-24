@@ -26,15 +26,16 @@ const AddShows = () => {
       const { data } = await axios.get('/api/show/now-playing', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (data.success) {
+      if (data.success && data.movies && data.movies.length > 0) {
         setNowPlayingMovies(data.movies);
       } else {
-        // Fallback to dummy data if API fails
+        // Use sample data without showing error
+        console.log('Using sample movies data');
         setNowPlayingMovies(dummyShowsData);
       }
     } catch (error) {
-      console.log('error in fetching movies: ', error);
-      // Fallback to dummy data if API fails
+      console.log('Using sample movies data due to API issue');
+      // Use sample data without showing error
       setNowPlayingMovies(dummyShowsData);
     } finally {
       setIsLoading(false);
@@ -132,7 +133,14 @@ if (isLoading) {
 return nowPlayingMovies.length > 0 ? (
   <>
     <Title text1="add" text2="Shows" />
-    <p className="mt-10 text-lg font-medium">Now Playing Movies</p>
+    <div className="mt-10 flex items-center gap-2">
+      <p className="text-lg font-medium">Now Playing Movies</p>
+      {nowPlayingMovies === dummyShowsData && (
+        <span className="text-sm text-yellow-500 bg-yellow-100 px-2 py-1 rounded">
+          Sample Data
+        </span>
+      )}
+    </div>
 
     <div className="overflow-x-auto pb-4">
       <div className="group flex flex-col sm:flex-row justify-start items-start gap-4 mt-4 w-max">

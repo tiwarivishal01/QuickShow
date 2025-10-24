@@ -5,7 +5,8 @@ import Movie from "../models/Movie.js";
 //api controller fn to get user booking
 export const getUserBookings = async (req, res) => {
     try {
-        const { userId } = req.auth;
+        const auth = req.auth();
+        const { userId } = auth;
         if (!userId) {
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         }
@@ -26,7 +27,8 @@ export const getUserBookings = async (req, res) => {
 export const updateFavorites = async (req, res) => {
     try {
         const { movieId } = req.body;
-        const { userId } = req.auth;
+        const auth = req.auth();
+        const { userId } = auth;
         if (!userId) {
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         }
@@ -52,7 +54,8 @@ export const updateFavorites = async (req, res) => {
 //get favorite
 export const getFavorites = async (req, res) => {
     try {
-        const { userId } = req.auth;
+        const auth = req.auth();
+        const { userId } = auth;
         if (!userId) {
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         }

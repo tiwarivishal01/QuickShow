@@ -3,7 +3,7 @@ import Booking from "../models/Booking.js";
 import Show from "../models/show.js";
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 
 //fn to check availability of seats
 export const checkSeatAvailability = async (showId, SelectedSeats) => {
@@ -30,11 +30,12 @@ export const checkSeatAvailability = async (showId, SelectedSeats) => {
 export const createBooking = async (req, res) => {
     try {
         // Get user ID from Clerk auth
-        const { userId } = req.auth || {};
+        const auth = req.auth();
+        const { userId } = auth || {};
         const { showId, selectedSeats } = req.body;
         const { origin } = req.headers;
 
-        console.log('Auth object:', req.auth);
+        console.log('Auth object:', auth);
         console.log('User ID:', userId);
         console.log('Request body:', req.body);
 
@@ -93,6 +94,13 @@ export const createBooking = async (req, res) => {
                 quantity: 1
             }];
 
+            if (!stripe) {
+                return res.status(500).json({
+                    success: false,
+                    message: "Payment service not configured. Please contact administrator."
+                });
+            }
+
             const session = await stripe.checkout.sessions.create({
                 success_url: `${origin}/my-bookings?success=true&session_id={CHECKOUT_SESSION_ID}`,
                 cancel_url: `${origin}/my-bookings?canceled=true`,
@@ -134,6 +142,12 @@ export const confirmStripeSession = async (req, res) => {
         const { sessionId } = req.body;
         if (!sessionId) {
             return res.status(400).json({ success: false, message: 'Missing sessionId' });
+        }
+        if (!stripe) {
+            return res.status(500).json({
+                success: false,
+                message: "Payment service not configured. Please contact administrator."
+            });
         }
         const session = await stripe.checkout.sessions.retrieve(sessionId);
         const bookingId = session?.metadata?.bookingId;
@@ -184,6 +198,14 @@ export const refreshPaymentLink = async (req, res) => {
             },
             quantity: 1,
         }];
+        
+        if (!stripe) {
+            return res.status(500).json({
+                success: false,
+                message: "Payment service not configured. Please contact administrator."
+            });
+        }
+        
         const session = await stripe.checkout.sessions.create({
             success_url: `${origin}/my-bookings?success=true&session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${origin}/my-bookings?canceled=true`,

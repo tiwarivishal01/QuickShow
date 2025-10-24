@@ -5,6 +5,13 @@ import Show from "../models/show.js";
 // API to get now playing movies from TMDB
 export const getNowPlayingMovies = async (req, res) => {
   try {
+    if (!process.env.TMDB_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        message: "TMDB API key not configured. Please contact administrator.",
+      });
+    }
+
     const { data } = await axios.get(
       "https://api.themoviedb.org/3/movie/now_playing",
       {
@@ -17,9 +24,18 @@ export const getNowPlayingMovies = async (req, res) => {
 
     res.json({ success: true, movies: data.results });
   } catch (error) {
+    console.error('TMDB API Error:', error.response?.status, error.message);
+    
+    if (error.response?.status === 401) {
+      return res.status(500).json({
+        success: false,
+        message: "TMDB API key is invalid or expired. Please contact administrator.",
+      });
+    }
+    
     res.status(500).json({
       success: false,
-      message: "Failed to fetch movies. " + error.message,
+      message: "Failed to fetch movies from TMDB. " + error.message,
     });
   }
 };

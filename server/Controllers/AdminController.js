@@ -6,7 +6,8 @@ import { clerkClient } from "@clerk/express";
 //api to check is user is admin
 export const checkAdminStatus = async (req, res) => {
     try {
-        const { userId } = req.auth;
+        const auth = req.auth();
+        const { userId } = auth;
         
         if (!userId) {
             return res.json({ success: true, isAdmin: false });

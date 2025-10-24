@@ -4,6 +4,12 @@ import Booking from '../models/Booking.js';
 
 export const stripeWebhooks = async (req, res) => {
   console.log('Stripe webhook received');
+  
+  if (!process.env.STRIPE_SECRET_KEY) {
+    console.error('Stripe secret key not configured');
+    return res.status(500).json({ error: 'Payment service not configured' });
+  }
+  
   const stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY);
   const sig = req.headers['stripe-signature'];
 

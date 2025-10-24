@@ -29,7 +29,7 @@ const SeatLayout = () => {
 
   const getshow = async () => {
     try {
-      const { data } = await axios.get(`/api/show/${id}`)
+      const { data } = await axios.get(`/api/show/movie/${id}`)
 
       if (data.success) {
         setshow(data)
@@ -55,7 +55,7 @@ const SeatLayout = () => {
 
     setselectedSeats((prev) =>
       prev.includes(seatId)
-        ? prev.filter((saet) => saet !== seatId)
+        ? prev.filter((seat) => seat !== seatId)
         : [...prev, seatId]
     );
   };
