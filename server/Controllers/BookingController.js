@@ -1,0 +1,249 @@
+import { inngest } from "../inngest/index.js";
+import Booking from "../models/Booking.js";
+import Show from "../models/show.js";
+import Stripe from 'stripe';
+import { getAuth } from '@clerk/express';
+
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
+
+//fn to check availability of seats
+export const checkSeatAvailability = async (showId, SelectedSeats) => {
+    try {
+        const showData = await Show.findById(showId);
+        if (!showData) {
+            return false;
+        }
+        const occupiedSeats = showData.occupiedSeat || {};
+        const isAnySeatTaken = SelectedSeats.some(Seat => occupiedSeats[Seat]);
+
+        return !isAnySeatTaken;
+
+    } catch (error) {
+        return false;
+    }
+}
+
+
+
+//
+
+export const createBooking = async (req, res) => {
+    try {
+        // Get user ID from Clerk auth
+        const { userId } = getAuth(req) || {};
+        const { showId, selectedSeats } = req.body;
+        const origin = req.headers.origin || 'http://localhost:5173';
+
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "User not authenticated" });
+        }
+
+        if (!showId || !selectedSeats || !Array.isArray(selectedSeats) || selectedSeats.length === 0) {
+            return res.status(400).json({ success: false, message: "Show ID and selected seats are required" });
+        }
+
+        //check if seat is available for selected show
+        const isAvailable = await checkSeatAvailability(showId, selectedSeats);
+
+        if (!isAvailable) {
+            return res.status(400).json({ success: false, message: "Seats are not available" });
+        }
+
+        //get the show details
+        const showData = await Show.findById(showId).populate('movie');
+
+        if (!showData) {
+            return res.status(404).json({ success: false, message: "Show not found" });
+        }
+
+        //create a new booking
+        const booking = await Booking.create({
+            user: userId,
+            show: showId,
+            amount: showData.showPrice * selectedSeats.length,
+            bookedSeats: selectedSeats,
+        })
+
+        // Mark seats as occupied
+        selectedSeats.forEach((seat) => {
+            showData.occupiedSeat[seat] = userId;
+        })
+        showData.markModified('occupiedSeat');
+        await showData.save();
+
+        // Create Stripe checkout session
+        try {
+            if (!process.env.STRIPE_SECRET_KEY) {
+                res.json({ success: true, booking, message: "Booking created but Stripe not configured" });
+                return;
+            }
+            
+            const line_items = [{
+                price_data: {
+                    currency: 'usd',
+                    product_data: {
+                        name: showData.movie.title,
+                    },
+                    unit_amount: Math.floor(booking.amount) * 100,
+                },
+                quantity: 1
+            }];
+
+            if (!stripe) {
+                return res.status(500).json({
+                    success: false,
+                    message: "Payment service not configured. Please contact administrator."
+                });
+            }
+
+            const session = await stripe.checkout.sessions.create({
+                success_url: `${origin}/my-bookings?success=true&session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${origin}/my-bookings?canceled=true`,
+                line_items: line_items,
+                mode: 'payment',
+                metadata: {
+                    bookingId: booking._id.toString(),
+                },
+                expires_at: Math.floor(Date.now() / 1000) + 1800, // expires in 30 minutes
+            });
+
+            booking.paymentLink = session.url;
+            await booking.save();
+
+            //run inngest scheduler fn to check payment status
+            inngest.send({
+                name: "app/checkpayment",
+                data: {
+                    bookingId: booking._id.toString()
+                }
+            }).catch(inngestError => {
+                console.error("Inngest send error (checkpayment):", inngestError.message);
+            });
+           
+
+            res.json({ success: true, booking, url: session.url });
+        } catch (stripeError) {
+            console.error("Stripe Checkout Error:", stripeError);
+            // If Stripe fails, still return success but without payment URL
+            res.json({ success: true, booking, message: "Booking created but payment setup failed" });
+        }
+
+    } catch (error) {
+        return res.status(500).json({ success: false, message: "Error in creating booking" });
+    }
+}
+
+// Confirm session fallback when webhook not available
+export const confirmStripeSession = async (req, res) => {
+    try {
+        const { sessionId } = req.body;
+        if (!sessionId) {
+            return res.status(400).json({ success: false, message: 'Missing sessionId' });
+        }
+        if (!stripe) {
+            return res.status(500).json({
+                success: false,
+                message: "Payment service not configured. Please contact administrator."
+            });
+        }
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        const bookingId = session?.metadata?.bookingId;
+        if (!bookingId) {
+            return res.status(400).json({ success: false, message: 'Missing bookingId in session' });
+        }
+        if (session.payment_status === 'paid') {
+            await Booking.findByIdAndUpdate(bookingId, {
+                isPaid: true,
+                paymentLink: ''
+            });
+            inngest.send({
+                name: 'app/show.booked',
+                data: {
+                  bookingId
+                }
+            }).catch(inngestError => {
+                console.error("Inngest send error (show.booked):", inngestError.message);
+            });
+            return res.json({ success: true, message: 'Payment confirmed', bookingId });
+            
+        }
+        return res.json({ success: false, message: 'Payment not completed yet' });
+    } catch (error) {
+        console.error('Confirm session error:', error);
+        res.status(500).json({ success: false, message: 'Internal error confirming session' });
+    }
+}
+
+// Refresh payment link for unpaid/expired sessions
+export const refreshPaymentLink = async (req, res) => {
+    try {
+        const { bookingId } = req.body;
+        const origin = req.headers.origin || 'http://localhost:5173';
+        const booking = await Booking.findById(bookingId).populate({
+            path: 'show',
+            populate: { path: 'movie' }
+        });
+        if (!booking) {
+            return res.status(404).json({ success: false, message: 'Booking not found' });
+        }
+        if (booking.isPaid) {
+            return res.json({ success: true, message: 'Booking already paid' });
+        }
+        const line_items = [{
+            price_data: {
+                currency: 'usd',
+                product_data: { name: booking.show.movie.title },
+                unit_amount: Math.floor(booking.amount) * 100,
+            },
+            quantity: 1,
+        }];
+        
+        if (!stripe) {
+            return res.status(500).json({
+                success: false,
+                message: "Payment service not configured. Please contact administrator."
+            });
+        }
+        
+        const session = await stripe.checkout.sessions.create({
+            success_url: `${origin}/my-bookings?success=true&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${origin}/my-bookings?canceled=true`,
+            line_items,
+            mode: 'payment',
+            metadata: { bookingId: booking._id.toString() },
+            expires_at: Math.floor(Date.now() / 1000) + 1800,
+        });
+        booking.paymentLink = session.url;
+        await booking.save();
+        res.json({ success: true, url: session.url });
+    } catch (error) {
+        console.error('Refresh payment link error:', error);
+        res.status(500).json({ success: false, message: 'Failed to refresh payment link' });
+    }
+}
+
+
+export const getOccupiedSeats = async (req, res) => {
+    try {
+        const { showId } = req.params;
+
+        if (!showId) {
+            return res.status(400).json({ success: false, message: "Show ID is required" });
+        }
+
+        const showData = await Show.findById(showId);
+
+        if (!showData) {
+            return res.status(404).json({ success: false, message: "Show not found" });
+        }
+
+        const occupiedSeats = Object.keys(showData.occupiedSeat || {});
+        res.json({ success: true, occupiedSeats });
+
+    } catch (error) {
+        return res.status(500).json({ success: false, message: "Error in getting occupied seats" });
+    }
+}
+
+
+

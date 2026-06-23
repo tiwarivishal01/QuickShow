@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Local databases & huge files
+mongodb/
+mongodb_data/
+mongodb.zip
+
+# Environment / secret files
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.*
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# System / OS
+.DS_Store
+Thumbs.db
