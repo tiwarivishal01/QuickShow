@@ -44,8 +44,8 @@ const syncUserUpdation = inngest.createFunction(
     const { id, first_name, last_name, email_addresses, image_url } = event.data;
     const userData = {
       _id: id,
-      email: email_addresses[0],
-      name: first_name + " " + last_name,
+      email: email_addresses[0]?.email_address || "",
+      name: `${first_name || ""} ${last_name || ""}`.trim(),
       image: image_url,
     };
     await User.findByIdAndUpdate(id, userData);
@@ -63,15 +63,18 @@ const ReleaseSeatsAndDeleteBooking = inngest.createFunction(
         await step.run('check-payment-status', async () => {
             const bookingId = event.data.bookingId;
             const booking = await Booking.findById(bookingId);
+            if (!booking) return;
 
             //if payment not made thn deleting booking and releasing the seat
             if (!booking.isPaid) {
                 const show = await Show.findById(booking.show);
-                booking.bookedSeats.forEach((seat) => {
-                    delete show.occupiedSeat[seat]
-                })
-                show.markModified('occupiedSeat')
-                await show.save()
+                if (show) {
+                    booking.bookedSeats.forEach((seat) => {
+                        delete show.occupiedSeat[seat]
+                    })
+                    show.markModified('occupiedSeat')
+                    await show.save()
+                }
                 await Booking.findByIdAndDelete(booking._id)
             }
         })

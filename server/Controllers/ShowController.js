@@ -27,8 +27,8 @@ const seedDefaultShowsIfNeeded = async () => {
         });
 
         if (nowPlayingRes.data && Array.isArray(nowPlayingRes.data.results) && nowPlayingRes.data.results.length > 0) {
-          // Take top 10 now playing movies
-          const tmdbMovies = nowPlayingRes.data.results.slice(0, 10);
+          // Take top 20 now playing movies to ensure 100+ shows
+          const tmdbMovies = nowPlayingRes.data.results.slice(0, 20);
           console.log(`Found ${tmdbMovies.length} now playing movies. Fetching details & credits...`);
 
           const detailedMovies = await Promise.all(
@@ -98,25 +98,26 @@ const seedDefaultShowsIfNeeded = async () => {
 
     const showsToCreate = [];
     const baseDate = new Date();
-    const dates = [0, 1, 2]; // today, tomorrow, day after
+    // Schedule shows across 5 dates spanning 10 years: Today, +1 year, +3 years, +7 years, and +10 years
+    const yearsOffsets = [0, 1, 3, 7, 10];
 
-    for (const offset of dates) {
+    for (let i = 0; i < yearsOffsets.length; i++) {
+      const yearOffset = yearsOffsets[i];
       const showDate = new Date();
-      showDate.setDate(baseDate.getDate() + offset);
+      showDate.setFullYear(baseDate.getFullYear() + yearOffset);
+      showDate.setDate(showDate.getDate() + (i * 2));
       const dateString = showDate.toISOString().split("T")[0];
 
       moviesToSeed.forEach((movieData, movieIdx) => {
-        let dateTime1, dateTime2;
-        if (offset === 0) {
-          dateTime1 = new Date(Date.now() + (2 + movieIdx) * 60 * 60 * 1000);
-          dateTime2 = new Date(Date.now() + (6 + movieIdx) * 60 * 60 * 1000);
-        } else {
-          dateTime1 = new Date(`${dateString}T12:00:00.000Z`);
-          dateTime1.setHours(dateTime1.getHours() + (movieIdx % 4));
-          
-          dateTime2 = new Date(`${dateString}T18:00:00.000Z`);
-          dateTime2.setHours(dateTime2.getHours() + (movieIdx % 4));
-        }
+        // Create 3 showtimes per date to ensure at least 100 shows
+        const dateTime1 = new Date(`${dateString}T10:00:00.000Z`);
+        dateTime1.setHours(dateTime1.getHours() + (movieIdx % 2));
+
+        const dateTime2 = new Date(`${dateString}T14:00:00.000Z`);
+        dateTime2.setHours(dateTime2.getHours() + (movieIdx % 2));
+
+        const dateTime3 = new Date(`${dateString}T18:00:00.000Z`);
+        dateTime3.setHours(dateTime3.getHours() + (movieIdx % 2));
 
         showsToCreate.push({
           movie: movieData._id,
@@ -128,6 +129,13 @@ const seedDefaultShowsIfNeeded = async () => {
         showsToCreate.push({
           movie: movieData._id,
           showDatetime: dateTime2,
+          showPrice: 10 + (movieIdx % 3) * 2,
+          occupiedSeat: {}
+        });
+
+        showsToCreate.push({
+          movie: movieData._id,
+          showDatetime: dateTime3,
           showPrice: 10 + (movieIdx % 3) * 2,
           occupiedSeat: {}
         });
