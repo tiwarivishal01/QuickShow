@@ -13,25 +13,86 @@ const seedDefaultShowsIfNeeded = async () => {
     }
 
     console.log("Seeding default shows...");
-    
-    // Ensure fallback movies exist in DB
-    for (const movieData of dummyShowsData) {
+
+    let moviesToSeed = [];
+    let tmdbSuccess = false;
+
+    if (process.env.TMDB_API_KEY) {
+      try {
+        console.log("Fetching now playing movies from TMDB API for seeding...");
+        const base_url = process.env.TMDB_BASE_URL || "https://api.themoviedb.org/3";
+        const nowPlayingRes = await axios.get(`${base_url}/movie/now_playing`, {
+          headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY}` },
+          timeout: 15000,
+        });
+
+        if (nowPlayingRes.data && Array.isArray(nowPlayingRes.data.results) && nowPlayingRes.data.results.length > 0) {
+          // Take top 10 now playing movies
+          const tmdbMovies = nowPlayingRes.data.results.slice(0, 10);
+          console.log(`Found ${tmdbMovies.length} now playing movies. Fetching details & credits...`);
+
+          const detailedMovies = await Promise.all(
+            tmdbMovies.map(async (m) => {
+              try {
+                const [detailsRes, creditsRes] = await Promise.all([
+                  axios.get(`${base_url}/movie/${m.id}`, {
+                    headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY}` },
+                    timeout: 10000,
+                  }),
+                  axios.get(`${base_url}/movie/${m.id}/credits`, {
+                    headers: { Authorization: `Bearer ${process.env.TMDB_API_KEY}` },
+                    timeout: 10000,
+                  }),
+                ]);
+
+                const details = detailsRes.data;
+                const credits = creditsRes.data;
+
+                return {
+                  _id: String(details.id),
+                  title: details.title,
+                  overview: details.overview || "",
+                  poster_path: details.poster_path || "",
+                  backdrop_path: details.backdrop_path || "",
+                  release_date: details.release_date || "",
+                  original_language: details.original_language || "",
+                  tagline: details.tagline || "",
+                  genres: (details.genres || []).map((g) => ({ id: g.id, name: g.name })),
+                  casts: (credits.cast || [])
+                    .filter((c) => !!c.profile_path)
+                    .slice(0, 20)
+                    .map((c) => ({ name: c.name, profile_path: c.profile_path })),
+                  vote_average: details.vote_average || 0,
+                  runtime: details.runtime || 120,
+                };
+              } catch (err) {
+                console.error(`Failed to fetch details for movie ${m.id}:`, err.message);
+                return null;
+              }
+            })
+          );
+
+          moviesToSeed = detailedMovies.filter(Boolean);
+          if (moviesToSeed.length > 0) {
+            tmdbSuccess = true;
+            console.log(`Successfully fetched details for ${moviesToSeed.length} TMDB movies.`);
+          }
+        }
+      } catch (tmdbError) {
+        console.warn("Failed to fetch movies from TMDB API during seeding:", tmdbError.message);
+      }
+    }
+
+    if (!tmdbSuccess) {
+      console.log("Using fallback dummy movies for seeding...");
+      moviesToSeed = dummyShowsData;
+    }
+
+    // Ensure movies exist in DB
+    for (const movieData of moviesToSeed) {
       const exists = await Movie.findById(movieData._id);
       if (!exists) {
-        await Movie.create({
-          _id: movieData._id,
-          title: movieData.title,
-          overview: movieData.overview,
-          poster_path: movieData.poster_path,
-          backdrop_path: movieData.backdrop_path,
-          release_date: movieData.release_date,
-          original_language: movieData.original_language,
-          tagline: movieData.tagline || "",
-          genres: movieData.genres,
-          casts: movieData.casts,
-          vote_average: movieData.vote_average,
-          runtime: movieData.runtime
-        });
+        await Movie.create(movieData);
       }
     }
 
@@ -44,7 +105,7 @@ const seedDefaultShowsIfNeeded = async () => {
       showDate.setDate(baseDate.getDate() + offset);
       const dateString = showDate.toISOString().split("T")[0];
 
-      dummyShowsData.forEach((movieData, movieIdx) => {
+      moviesToSeed.forEach((movieData, movieIdx) => {
         let dateTime1, dateTime2;
         if (offset === 0) {
           dateTime1 = new Date(Date.now() + (2 + movieIdx) * 60 * 60 * 1000);
